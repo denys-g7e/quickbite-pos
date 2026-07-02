@@ -1,0 +1,11 @@
+node_modules/
+dist/
+electron/dist/
+.vite/
+release/
+*.log
+.DS_Store
+Thumbs.db
+resources/icon.png
+Instalacion/
+*.exe
