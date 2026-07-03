@@ -9,6 +9,9 @@ export function initializeDatabase(db: Database.Database) {
       password TEXT NOT NULL,
       role TEXT NOT NULL CHECK(role IN ('admin', 'employee')),
       pin TEXT,
+      pin_attempts INTEGER DEFAULT 0,
+      pin_blocked_until TEXT,
+      must_change_password INTEGER DEFAULT 0,
       is_active INTEGER DEFAULT 1,
       created_at TEXT DEFAULT (datetime('now', 'localtime')),
       created_by INTEGER REFERENCES users(id)

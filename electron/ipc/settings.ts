@@ -16,6 +16,9 @@ function decryptValue(value: string): string {
       return safeStorage.decryptString(buf)
     } catch { return value }
   }
+  if (!safeStorage.isEncryptionAvailable()) {
+    console.warn('[settings] safeStorage no disponible — valores sensibles en texto plano')
+  }
   return value
 }
 

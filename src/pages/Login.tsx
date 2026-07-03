@@ -45,6 +45,10 @@ export default function Login() {
           return
         }
         login(user)
+        if (user.mustChangePassword) {
+          navigate('/employee/profile')
+          return
+        }
         navigate(role === 'admin' ? '/admin/dashboard' : '/pos')
       }
     } catch (err: any) {

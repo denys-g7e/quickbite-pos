@@ -19,12 +19,18 @@ export function registerShiftHandlers(ipcMain: IpcMain, db: Database.Database) {
   })
 
   ipcMain.handle('shifts:close', (_event, data: { id: number; closingAmount: number; notes?: string }) => {
-    const shift = db.prepare("SELECT * FROM cash_shifts WHERE id = ? AND status = 'open'").get(data.id) as any
-    if (!shift) throw new Error('Turno no encontrado o ya cerrado')
-    db.prepare(
-      "UPDATE cash_shifts SET closing_amount = ?, closed_at = datetime('now', 'localtime'), status = 'closed', notes = COALESCE(?, notes) WHERE id = ?"
-    ).run(data.closingAmount, data.notes || null, data.id)
-    return db.prepare("SELECT * FROM cash_shifts WHERE id = ?").get(data.id)
+    const result = db.transaction(() => {
+      const shift = db.prepare("SELECT * FROM cash_shifts WHERE id = ? AND status = 'open'").get(data.id) as any
+      if (!shift) throw new Error('Turno no encontrado o ya cerrado')
+      const totalSales = (db.prepare(
+        "SELECT COALESCE(SUM(total), 0) as total FROM orders WHERE date(created_at) = date('now', 'localtime') AND status != 'cancelled'"
+      ).get() as any)?.total || 0
+      db.prepare(
+        "UPDATE cash_shifts SET closing_amount = ?, closed_at = datetime('now', 'localtime'), status = 'closed', notes = COALESCE(?, notes) WHERE id = ?"
+      ).run(data.closingAmount, data.notes || null, data.id)
+      return { ...shift, closing_amount: data.closingAmount, total_sales: totalSales }
+    })()
+    return result
   })
 
   ipcMain.handle('shifts:current', () => {

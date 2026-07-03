@@ -59,7 +59,7 @@ export function registerUserHandlers(ipcMain: IpcMain, db: Database.Database) {
     return { updated: true }
   })
 
-  ipcMain.handle('users:toggle-active', (_event, id: number) => {
+ipcMain.handle('users:toggle-active', (_event, id: number) => {
     const user = db.prepare('SELECT is_active FROM users WHERE id = ?').get(id) as any
     if (!user) throw new Error('Usuario no encontrado')
     const newState = user.is_active ? 0 : 1
@@ -69,7 +69,7 @@ export function registerUserHandlers(ipcMain: IpcMain, db: Database.Database) {
 
   ipcMain.handle('users:reset-password', (_event, id: number, password: string) => {
     const hashed = hashPwd(password)
-    db.prepare('UPDATE users SET password = ? WHERE id = ?').run(hashed, id)
+    db.prepare('UPDATE users SET password = ?, must_change_password = 0 WHERE id = ?').run(hashed, id)
     return { updated: true }
   })
 
@@ -85,7 +85,9 @@ export function registerUserHandlers(ipcMain: IpcMain, db: Database.Database) {
     if (data.email !== undefined) { fields.push('email = ?'); params.push(data.email) }
     if (data.password !== undefined) {
       const hashed = hashPwd(data.password)
-      fields.push('password = ?'); params.push(hashed)
+      fields.push('password = ?')
+      params.push(hashed)
+      fields.push('must_change_password = 0')
     }
     if (fields.length === 0) return { updated: false }
     params.push(id)

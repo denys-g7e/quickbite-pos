@@ -30,39 +30,43 @@ export function registerOrderHandlers(ipcMain: IpcMain, db: Database.Database) {
   }) => {
     const orderNumber = generateOrderNumber(db)
 
-    const result = db.prepare(`
-      INSERT INTO orders (order_number, customer_name, customer_nit, service_type, table_number, subtotal, discount, total, payment_method, amount_paid, "change", employee_id, status, completed_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'completed', datetime('now', 'localtime'))
-    `).run(
-      orderNumber,
-      data.customerName || 'Consumidor Final',
-      data.customerNIT || null,
-      data.serviceType,
-      data.tableNumber || null,
-      data.subtotal,
-      data.discount || 0,
-      data.total,
-      data.paymentMethod,
-      data.amountPaid || data.total,
-      data.change || 0,
-      data.employeeId,
-    )
+    const orderId = db.transaction(() => {
+      const result = db.prepare(`
+        INSERT INTO orders (order_number, customer_name, customer_nit, service_type, table_number, subtotal, discount, total, payment_method, amount_paid, "change", employee_id, status, completed_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'completed', datetime('now', 'localtime'))
+      `).run(
+        orderNumber,
+        data.customerName || 'Consumidor Final',
+        data.customerNIT || null,
+        data.serviceType,
+        data.tableNumber || null,
+        data.subtotal,
+        data.discount || 0,
+        data.total,
+        data.paymentMethod,
+        data.amountPaid || data.total,
+        data.change || 0,
+        data.employeeId,
+      )
 
-    const orderId = result.lastInsertRowid as number
+      const orderId = result.lastInsertRowid as number
 
-    const insertItem = db.prepare(`
-      INSERT INTO order_items (order_id, product_id, product_name, product_price, quantity, subtotal, notes, category_name)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `)
+      const insertItem = db.prepare(`
+        INSERT INTO order_items (order_id, product_id, product_name, product_price, quantity, subtotal, notes, category_name)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `)
 
-    const deductStock = db.prepare(`
-      UPDATE products SET stock = stock - ? WHERE id = ? AND stock >= 0
-    `)
+      const deductStock = db.prepare(`
+        UPDATE products SET stock = stock - ? WHERE id = ? AND stock >= 0
+      `)
 
-    for (const item of data.items) {
-      insertItem.run(orderId, item.productId, item.productName, item.productPrice, item.quantity, item.subtotal, item.notes || null, item.categoryName || '')
-      deductStock.run(item.quantity, item.productId)
-    }
+      for (const item of data.items) {
+        insertItem.run(orderId, item.productId, item.productName, item.productPrice, item.quantity, item.subtotal, item.notes || null, item.categoryName || '')
+        deductStock.run(item.quantity, item.productId)
+      }
+
+      return orderId
+    })()
 
     return {
       id: orderId,
@@ -128,9 +132,25 @@ export function registerOrderHandlers(ipcMain: IpcMain, db: Database.Database) {
     return order
   })
 
+  const ALLOWED_TRANSITIONS: Record<string, string[]> = {
+    pending: ['preparing', 'cancelled'],
+    preparing: ['ready', 'cancelled'],
+    ready: ['completed', 'cancelled'],
+    completed: ['cancelled'],
+    cancelled: [],
+  }
+
   ipcMain.handle('orders:update-status', (_event, id: number, status: string) => {
+    const VALID_STATUSES = ['pending', 'preparing', 'ready', 'completed', 'cancelled']
+    if (!VALID_STATUSES.includes(status)) throw new Error('Estado inválido')
+
     const order = db.prepare("SELECT status FROM orders WHERE id = ?").get(id) as any
     if (!order) throw new Error('Orden no encontrada')
+
+    const allowed = ALLOWED_TRANSITIONS[order.status]
+    if (!allowed || !allowed.includes(status)) {
+      throw new Error(`Transición no permitida: ${order.status} → ${status}`)
+    }
 
     const items = db.prepare("SELECT product_id, quantity FROM order_items WHERE order_id = ?").all(id) as any[]
     const changeStock = db.prepare(`UPDATE products SET stock = stock + ? WHERE id = ? AND stock >= 0`)

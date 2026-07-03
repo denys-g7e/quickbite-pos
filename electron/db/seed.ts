@@ -13,8 +13,8 @@ export function seedDatabase(db: Database.Database) {
   const existingAdmin = db.prepare("SELECT id FROM users WHERE email = 'admin@quickbite.com'").get()
   if (!existingAdmin) {
     db.prepare(
-      'INSERT INTO users (name, email, password, role, pin) VALUES (?, ?, ?, ?, ?)'
-    ).run('Administrador', 'admin@quickbite.com', adminPassword, 'admin', null)
+      'INSERT INTO users (name, email, password, role, pin, must_change_password) VALUES (?, ?, ?, ?, ?, ?)'
+    ).run('Administrador', 'admin@quickbite.com', adminPassword, 'admin', null, 1)
   }
 
   const catStmt = db.prepare(

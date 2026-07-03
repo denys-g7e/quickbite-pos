@@ -163,9 +163,12 @@ function registerDbHandlers() {
     const row = db.prepare("SELECT value FROM settings WHERE key = 'app_activation'").get() as any
     return row?.value === 'activated'
   })
+  const ACTIVATION_HASH = '895470d0d142c8c98c48e112cbc7bf9dc1d99df1b82915787cc57d7edb2cac8c'
+
   ipcMain.handle('app:activate', (_event, key: string) => {
     if (!db) return false
-    if (key === 'denys123') {
+    const hash = require('crypto').createHash('sha256').update(key).digest('hex')
+    if (hash === ACTIVATION_HASH) {
       db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('app_activation', 'activated')").run()
       return true
     }
@@ -195,6 +198,13 @@ function runMigrations() {
   const hasCategoryName = cols.some((c: any) => c.name === 'category_name')
   if (!hasCategoryName) {
     db.exec("ALTER TABLE order_items ADD COLUMN category_name TEXT DEFAULT ''")
+  }
+
+  const userCols = db.prepare("PRAGMA table_info(users)").all() as any[]
+  if (!userCols.some((c: any) => c.name === 'pin_attempts')) {
+    db.exec("ALTER TABLE users ADD COLUMN pin_attempts INTEGER DEFAULT 0")
+    db.exec("ALTER TABLE users ADD COLUMN pin_blocked_until TEXT")
+    db.exec("ALTER TABLE users ADD COLUMN must_change_password INTEGER DEFAULT 0")
   }
 }
 
