@@ -16,6 +16,7 @@ const Shifts = lazy(() => import('./pages/admin/Shifts'))
 const POS = lazy(() => import('./pages/employee/POS'))
 const MyOrders = lazy(() => import('./pages/employee/MyOrders'))
 const Profile = lazy(() => import('./pages/employee/Profile'))
+const Kitchen = lazy(() => import('./pages/kds/Kitchen'))
 
 function LoadingFallback() {
   return (
@@ -127,6 +128,7 @@ export default function App() {
         <Route path="/pos" element={<ProtectedRoute role="employee"><Suspense fallback={<LoadingFallback />}><POS /></Suspense></ProtectedRoute>} />
         <Route path="/employee/orders" element={<ProtectedRoute role="employee"><Suspense fallback={<LoadingFallback />}><MyOrders /></Suspense></ProtectedRoute>} />
         <Route path="/employee/profile" element={<ProtectedRoute role="employee"><Suspense fallback={<LoadingFallback />}><Profile /></Suspense></ProtectedRoute>} />
+        <Route path="/kds" element={<ProtectedRoute><Suspense fallback={<LoadingFallback />}><Kitchen /></Suspense></ProtectedRoute>} />
         <Route path="/" element={<Navigate to="/login" replace />} />
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>

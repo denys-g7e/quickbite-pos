@@ -30,7 +30,7 @@ contextBridge.exposeInMainWorld('api', {
     getById: (id: number) => ipcRenderer.invoke('orders:get-by-id', id),
     updateStatus: (id: number, status: string) =>
       ipcRenderer.invoke('orders:update-status', id, status),
-    cancel: (id: number) => ipcRenderer.invoke('orders:cancel', id),
+    cancel: (id: number, reason?: string) => ipcRenderer.invoke('orders:cancel', id, reason),
     getStats: (period?: string) => ipcRenderer.invoke('orders:stats', period),
     getTodaySales: () => ipcRenderer.invoke('orders:today-sales'),
     getTodayOrders: () => ipcRenderer.invoke('orders:today-orders'),
@@ -45,6 +45,13 @@ contextBridge.exposeInMainWorld('api', {
     getPurgeCount: (beforeDate: string) => ipcRenderer.invoke('orders:purge-count', beforeDate),
     purge: (beforeDate: string) => ipcRenderer.invoke('orders:purge', beforeDate),
     getCustomerHistory: (customerName: string) => ipcRenderer.invoke('orders:customer-history', customerName),
+    createDraft: (data: any) => ipcRenderer.invoke('orders:create-draft', data),
+    addItems: (orderId: number, items: any[]) => ipcRenderer.invoke('orders:add-items', orderId, items),
+    removeItem: (itemId: number) => ipcRenderer.invoke('orders:remove-item', itemId),
+    openTables: () => ipcRenderer.invoke('orders:open-tables'),
+    closeTable: (id: number, data: any) => ipcRenderer.invoke('orders:close-table', id, data),
+    splitBill: (sourceOrderId: number, splits: any[]) => ipcRenderer.invoke('orders:split-bill', sourceOrderId, splits),
+    mergeTables: (sourceOrderId: number, targetOrderId: number) => ipcRenderer.invoke('orders:merge-tables', sourceOrderId, targetOrderId),
   },
   users: {
     list: () => ipcRenderer.invoke('users:list'),
@@ -77,10 +84,30 @@ contextBridge.exposeInMainWorld('api', {
     list: (dateFilter?: string) => ipcRenderer.invoke('shifts:list', dateFilter),
     check: () => ipcRenderer.invoke('shifts:check'),
   },
+  happyHour: {
+    listRules: () => ipcRenderer.invoke('happy-hour:list-rules'),
+    createRule: (data: any) => ipcRenderer.invoke('happy-hour:create-rule', data),
+    updateRule: (id: number, data: any) => ipcRenderer.invoke('happy-hour:update-rule', id, data),
+    deleteRule: (id: number) => ipcRenderer.invoke('happy-hour:delete-rule', id),
+    getActiveRules: () => ipcRenderer.invoke('happy-hour:active-rules'),
+    getProductDiscount: (productId: number, categoryId: number | null, price: number, quantity: number) =>
+      ipcRenderer.invoke('happy-hour:product-discount', productId, categoryId, price, quantity),
+  },
+  kds: {
+    getActiveOrders: () => ipcRenderer.invoke('kds:get-active-orders'),
+    setItemStatus: (itemId: number, status: string) => ipcRenderer.invoke('kds:set-item-status', itemId, status),
+    getByOrder: (orderId: number) => ipcRenderer.invoke('kds:get-by-order', orderId),
+    cancelItem: (itemId: number, reason: string) => ipcRenderer.invoke('kds:cancel-item', itemId, reason),
+    openWindow: () => ipcRenderer.invoke('kds:open-window'),
+  },
+  audit: {
+    list: (filters?: any) => ipcRenderer.invoke('audit:list', filters),
+  },
   app: {
     minimize: () => ipcRenderer.invoke('app:minimize'),
     maximize: () => ipcRenderer.invoke('app:maximize'),
     close: () => ipcRenderer.invoke('app:close'),
+    restart: () => ipcRenderer.invoke('app:restart'),
     exportDB: () => ipcRenderer.invoke('app:export-db'),
     importDB: () => ipcRenderer.invoke('app:import-db'),
     selectLogo: () => ipcRenderer.invoke('app:select-logo'),

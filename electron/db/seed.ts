@@ -1,10 +1,8 @@
 import Database from 'better-sqlite3'
-import crypto from 'crypto'
+import bcrypt from 'bcrypt'
 
 function hashPwd(password: string): string {
-  const salt = crypto.randomBytes(16).toString('hex')
-  const hash = crypto.pbkdf2Sync(password, salt, 100000, 64, 'sha512').toString('hex')
-  return `${salt}:${hash}`
+  return bcrypt.hashSync(password, 12)
 }
 
 export function seedDatabase(db: Database.Database) {

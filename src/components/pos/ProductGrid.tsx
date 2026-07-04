@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react'
-import { Search, Plus } from 'lucide-react'
+import React, { useState, useEffect, useRef } from 'react'
+import { Search, Plus, Zap } from 'lucide-react'
 import { useCartStore } from '../../store/cartStore'
 import { useUIStore } from '../../store/uiStore'
 
@@ -9,13 +9,36 @@ export function ProductGrid() {
   const [loading, setLoading] = useState(true)
   const [demoMode, setDemoMode] = useState(false)
   const [stockThreshold, setStockThreshold] = useState(10)
+  const [activeHHRules, setActiveHHRules] = useState<any[]>([])
+  const hhProductIds = useRef<Set<number>>(new Set())
+  const hhCategoryIds = useRef<Set<number>>(new Set())
   const { addItem } = useCartStore()
   const { selectedCategory, setSelectedCategory, searchQuery, setSearchQuery } = useUIStore()
 
   useEffect(() => {
     window.api.settings.get('demo_mode').then((v) => setDemoMode(v === 'true')).catch(() => {})
     window.api.settings.get('stock_alert_threshold').then((v) => setStockThreshold(parseInt(v || '10', 10))).catch(() => {})
+    loadActiveHH()
+    const interval = setInterval(loadActiveHH, 30000)
+    return () => clearInterval(interval)
   }, [])
+
+  const loadActiveHH = async () => {
+    try {
+      const rules = await window.api.happyHour.getActiveRules()
+      setActiveHHRules(rules)
+      hhProductIds.current = new Set(rules.filter((r: any) => r.product_id).map((r: any) => r.product_id))
+      hhCategoryIds.current = new Set(rules.filter((r: any) => r.category_id && !r.product_id).map((r: any) => r.category_id))
+    } catch {}
+  }
+
+  const hasHappyHour = (product: any) => {
+    if (hhProductIds.current.has(product.id)) return true
+    if (product.category_id && hhCategoryIds.current.has(product.category_id)) {
+      if (!hhProductIds.current.has(product.id)) return true
+    }
+    return false
+  }
 
   useEffect(() => {
     loadCategories()
@@ -122,11 +145,18 @@ export function ProductGrid() {
                 </div>
                 <div className="flex items-start justify-between mb-1">
                   <p className="text-body-sm font-medium text-text-primary line-clamp-2 flex-1">{product.name}</p>
-                  {product.stock >= 0 && product.stock <= stockThreshold && (
-                    <span className="ml-2 text-label px-1.5 py-0.5 rounded-full bg-status-warning/20 text-status-warning whitespace-nowrap">
-                      Stock: {product.stock}
-                    </span>
-                  )}
+                  <div className="flex gap-1 ml-2 flex-shrink-0">
+                    {hasHappyHour(product) && (
+                      <span className="text-label px-1.5 py-0.5 rounded-full bg-status-success/20 text-status-success whitespace-nowrap flex items-center gap-0.5">
+                        <Zap size={10} /> HH
+                      </span>
+                    )}
+                    {product.stock >= 0 && product.stock <= stockThreshold && (
+                      <span className="text-label px-1.5 py-0.5 rounded-full bg-status-warning/20 text-status-warning whitespace-nowrap">
+                        Stock: {product.stock}
+                      </span>
+                    )}
+                  </div>
                 </div>
                 <p className="text-caption text-text-muted mb-2">{product.category_name}</p>
                 <div className="flex items-center justify-between">

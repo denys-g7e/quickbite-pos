@@ -1,8 +1,10 @@
 import { IpcMain } from 'electron'
 import Database from 'better-sqlite3'
+import { sessionStore } from '../session'
 
 export function registerShiftHandlers(ipcMain: IpcMain, db: Database.Database) {
   ipcMain.handle('shifts:open', (_event, data: { employeeId: number; openingAmount: number; notes?: string }) => {
+    sessionStore.requireActive(db, 'admin')
     const user = db.prepare("SELECT role FROM users WHERE id = ?").get(data.employeeId) as any
     if (!user || user.role !== 'admin') throw new Error('Solo el administrador puede abrir turno')
     const existing = db.prepare("SELECT id FROM cash_shifts WHERE status = 'open'").get() as any
@@ -19,6 +21,7 @@ export function registerShiftHandlers(ipcMain: IpcMain, db: Database.Database) {
   })
 
   ipcMain.handle('shifts:close', (_event, data: { id: number; closingAmount: number; notes?: string }) => {
+    sessionStore.requireActive(db, 'admin')
     const result = db.transaction(() => {
       const shift = db.prepare("SELECT * FROM cash_shifts WHERE id = ? AND status = 'open'").get(data.id) as any
       if (!shift) throw new Error('Turno no encontrado o ya cerrado')

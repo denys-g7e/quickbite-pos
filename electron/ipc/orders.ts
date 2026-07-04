@@ -2,6 +2,9 @@ import { IpcMain, app } from 'electron'
 import Database from 'better-sqlite3'
 import * as path from 'path'
 import * as fs from 'fs'
+import { sessionStore } from '../session'
+import { logAudit } from './audit'
+import { applyHappyHourToItem, getActiveHappyHourRules } from './happy-hour'
 const ExcelJS = require('exceljs')
 const AdmZip = require('adm-zip')
 
@@ -28,7 +31,36 @@ export function registerOrderHandlers(ipcMain: IpcMain, db: Database.Database) {
     change?: number
     employeeId: number
   }) => {
+    sessionStore.requireActive(db, 'admin', 'employee')
     const orderNumber = generateOrderNumber(db)
+
+    let itemDiscount = 0
+    let discountLabels: string[] = []
+
+    const activeRules = getActiveHappyHourRules(db)
+    if (activeRules.length > 0) {
+      const itemsWithDiscount = data.items.map((item) => {
+        const p = db.prepare("SELECT category_id FROM products WHERE id = ?").get(item.productId) as any
+        const { discount, discountLabel } = applyHappyHourToItem(db, item.productId, p?.category_id || null, item.productPrice, item.quantity)
+        if (discountLabel) discountLabels.push(discountLabel)
+        return { ...item, happyHourDiscount: discount }
+      })
+      const serverDiscount = itemsWithDiscount.reduce((sum, i) => sum + i.happyHourDiscount, 0)
+
+      if (Math.abs((data.discount || 0) - serverDiscount) > 0.01) {
+        console.log(`[security] Happy Hour override: client=${data.discount}, server=${serverDiscount}`)
+        logAudit(db, { userId: data.employeeId, action: 'price_override', entityType: 'order', details: { attemptedDiscount: data.discount, correctedDiscount: serverDiscount } })
+        itemDiscount = serverDiscount
+      } else {
+        itemDiscount = data.discount || 0
+      }
+    } else {
+      itemDiscount = data.discount || 0
+    }
+
+    const total = data.subtotal - itemDiscount
+    const amountPaid = data.amountPaid || total
+    const changeAmount = data.paymentMethod === 'efectivo' ? Math.max(0, amountPaid - total) : 0
 
     const orderId = db.transaction(() => {
       const result = db.prepare(`
@@ -41,19 +73,19 @@ export function registerOrderHandlers(ipcMain: IpcMain, db: Database.Database) {
         data.serviceType,
         data.tableNumber || null,
         data.subtotal,
-        data.discount || 0,
-        data.total,
+        itemDiscount,
+        total,
         data.paymentMethod,
-        data.amountPaid || data.total,
-        data.change || 0,
+        amountPaid,
+        changeAmount,
         data.employeeId,
       )
 
       const orderId = result.lastInsertRowid as number
 
       const insertItem = db.prepare(`
-        INSERT INTO order_items (order_id, product_id, product_name, product_price, quantity, subtotal, notes, category_name)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO order_items (order_id, product_id, product_name, product_price, quantity, subtotal, notes, category_name, item_status)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pendiente')
       `)
 
       const deductStock = db.prepare(`
@@ -71,6 +103,9 @@ export function registerOrderHandlers(ipcMain: IpcMain, db: Database.Database) {
     return {
       id: orderId,
       orderNumber,
+      discount: itemDiscount,
+      total: total,
+      discountLabels: discountLabels.length > 0 ? [...new Set(discountLabels)] : [],
     }
   })
 
@@ -133,7 +168,7 @@ export function registerOrderHandlers(ipcMain: IpcMain, db: Database.Database) {
   })
 
   const ALLOWED_TRANSITIONS: Record<string, string[]> = {
-    pending: ['preparing', 'cancelled'],
+    pending: ['preparing', 'completed', 'cancelled'],
     preparing: ['ready', 'cancelled'],
     ready: ['completed', 'cancelled'],
     completed: ['cancelled'],
@@ -141,6 +176,7 @@ export function registerOrderHandlers(ipcMain: IpcMain, db: Database.Database) {
   }
 
   ipcMain.handle('orders:update-status', (_event, id: number, status: string) => {
+    sessionStore.requireActive(db, 'admin', 'employee')
     const VALID_STATUSES = ['pending', 'preparing', 'ready', 'completed', 'cancelled']
     if (!VALID_STATUSES.includes(status)) throw new Error('Estado inválido')
 
@@ -161,26 +197,42 @@ export function registerOrderHandlers(ipcMain: IpcMain, db: Database.Database) {
       for (const item of items) { changeStock.run(-item.quantity, item.product_id) }
     }
 
+    if (status === 'completed') {
+      db.prepare("UPDATE order_items SET item_status = 'entregado', ready_at = COALESCE(ready_at, datetime('now','localtime')) WHERE order_id = ? AND item_status != 'cancelado'").run(id)
+    }
+    if (status === 'ready') {
+      db.prepare("UPDATE order_items SET item_status = 'listo', ready_at = COALESCE(ready_at, datetime('now','localtime')) WHERE order_id = ? AND item_status NOT IN ('listo','entregado','cancelado')").run(id)
+    }
+    if (status === 'preparing') {
+      db.prepare("UPDATE order_items SET item_status = CASE WHEN category_name IN ('Bebidas') THEN 'en_barra' ELSE 'en_cocina' END WHERE order_id = ? AND item_status = 'pendiente'").run(id)
+    }
+
     const completedAt = status === 'completed' ? new Date().toISOString() : null
     db.prepare('UPDATE orders SET status = ?, completed_at = COALESCE(?, completed_at) WHERE id = ?').run(status, completedAt, id)
     return { updated: true }
   })
 
-  ipcMain.handle('orders:cancel', (_event, id: number) => {
+  ipcMain.handle('orders:cancel', (_event, id: number, reason?: string) => {
+    sessionStore.requireActive(db, 'admin', 'employee')
     const order = db.prepare("SELECT status FROM orders WHERE id = ?").get(id) as any
     if (!order) throw new Error('Orden no encontrada')
 
-    const items = db.prepare("SELECT product_id, quantity FROM order_items WHERE order_id = ?").all(id) as any[]
-
-    const restoreStock = db.prepare(`
-      UPDATE products SET stock = stock + ? WHERE id = ? AND stock >= 0
-    `)
-
-    for (const item of items) {
-      restoreStock.run(item.quantity, item.product_id)
+    const allowed = ALLOWED_TRANSITIONS[order.status]
+    if (!allowed || !allowed.includes('cancelled')) {
+      throw new Error(`No se puede cancelar una orden en estado ${order.status}`)
     }
 
-    db.prepare("UPDATE orders SET status = 'cancelled' WHERE id = ?").run(id)
+    db.transaction(() => {
+      const items = db.prepare("SELECT product_id, quantity FROM order_items WHERE order_id = ?").all(id) as any[]
+      const restoreStock = db.prepare(`UPDATE products SET stock = stock + ? WHERE id = ? AND stock >= 0`)
+      for (const item of items) {
+        restoreStock.run(item.quantity, item.product_id)
+      }
+      db.prepare("UPDATE order_items SET item_status = 'cancelado', cancel_reason = ? WHERE order_id = ? AND item_status NOT IN ('cancelado','entregado')").run(reason || null, id)
+      db.prepare("UPDATE orders SET status = 'cancelled' WHERE id = ?").run(id)
+    })()
+    const session = sessionStore.get()
+    logAudit(db, { userId: session?.id, action: 'order_cancelled', entityType: 'order', entityId: id, details: { previousStatus: order.status, reason } })
     return { cancelled: true }
   })
 
@@ -307,6 +359,7 @@ export function registerOrderHandlers(ipcMain: IpcMain, db: Database.Database) {
     const params: any[] = []
     if (filters?.dateFrom) { query += ' AND o.created_at >= ?'; params.push(filters.dateFrom) }
     if (filters?.dateTo) { query += ' AND o.created_at <= ?'; params.push(filters.dateTo) }
+    if (filters?.status) { query += ' AND o.status = ?'; params.push(filters.status) }
     query += ' ORDER BY o.created_at DESC'
 
     const rows = db.prepare(query).all(...params) as any[]
@@ -422,6 +475,159 @@ export function registerOrderHandlers(ipcMain: IpcMain, db: Database.Database) {
     fs.unlinkSync(txtPath)
 
     return { path: zipPath, count: orders.length }
+  })
+
+  ipcMain.handle('orders:create-draft', (_event, data: {
+    serviceType: string
+    tableNumber?: number
+    customerName?: string
+    employeeId: number
+  }) => {
+    sessionStore.requireActive(db, 'admin', 'employee')
+    const orderNumber = generateOrderNumber(db)
+    const result = db.prepare(`
+      INSERT INTO orders (order_number, customer_name, service_type, table_number, employee_id, status)
+      VALUES (?, ?, ?, ?, ?, 'pending')
+    `).run(orderNumber, data.customerName || 'Mesa ' + (data.tableNumber || ''), data.serviceType, data.tableNumber || null, data.employeeId)
+    return { id: result.lastInsertRowid as number, orderNumber }
+  })
+
+  ipcMain.handle('orders:add-items', (_event, orderId: number, items: Array<{
+    productId: number
+    productName: string
+    productPrice: number
+    categoryName?: string
+    quantity: number
+    notes?: string
+  }>) => {
+    sessionStore.requireActive(db, 'admin', 'employee')
+    const order = db.prepare("SELECT id, status FROM orders WHERE id = ?").get(orderId) as any
+    if (!order) throw new Error('Orden no encontrada')
+    if (order.status !== 'pending') throw new Error('Solo se pueden agregar items a ordenes abiertas')
+
+    db.transaction(() => {
+      const insertItem = db.prepare(`
+        INSERT INTO order_items (order_id, product_id, product_name, product_price, quantity, subtotal, notes, category_name, item_status)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pendiente')
+      `)
+      const deductStock = db.prepare(`UPDATE products SET stock = stock - ? WHERE id = ? AND stock >= 0`)
+      for (const item of items) {
+        const subtotal = item.productPrice * item.quantity
+        insertItem.run(orderId, item.productId, item.productName, item.productPrice, item.quantity, subtotal, item.notes || null, item.categoryName || '')
+        deductStock.run(item.quantity, item.productId)
+      }
+    })()
+    return { added: items.length }
+  })
+
+  ipcMain.handle('orders:remove-item', (_event, itemId: number) => {
+    sessionStore.requireActive(db, 'admin', 'employee')
+    const item = db.prepare(`
+      SELECT oi.id, oi.product_id, oi.quantity, oi.order_id, o.status
+      FROM order_items oi JOIN orders o ON oi.order_id = o.id
+      WHERE oi.id = ?
+    `).get(itemId) as any
+    if (!item) throw new Error('Item no encontrado')
+    if (item.status !== 'pending') throw new Error('Solo se pueden quitar items de ordenes abiertas')
+    db.transaction(() => {
+      db.prepare(`UPDATE products SET stock = stock + ? WHERE id = ? AND stock >= 0`).run(item.quantity, item.product_id)
+      db.prepare("DELETE FROM order_items WHERE id = ?").run(itemId)
+    })()
+    return { removed: true }
+  })
+
+  ipcMain.handle('orders:open-tables', () => {
+    return db.prepare(`
+      SELECT o.*, u.name as employee_name,
+        (SELECT COUNT(*) FROM order_items oi WHERE oi.order_id = o.id AND oi.item_status NOT IN ('cancelado','entregado')) as active_items,
+        (SELECT COALESCE(SUM(oi.subtotal), 0) FROM order_items oi WHERE oi.order_id = o.id AND oi.item_status NOT IN ('cancelado')) as current_total
+      FROM orders o
+      LEFT JOIN users u ON o.employee_id = u.id
+      WHERE o.status IN ('pending', 'preparing', 'ready') AND o.service_type = 'mesa'
+      ORDER BY o.created_at ASC
+    `).all()
+  })
+
+  ipcMain.handle('orders:close-table', (_event, id: number, data: {
+    paymentMethod: string
+    amountPaid?: number
+    discount?: number
+    customerNIT?: string
+  }) => {
+    sessionStore.requireActive(db, 'admin', 'employee')
+    const order = db.prepare("SELECT * FROM orders WHERE id = ? AND status = 'pending'").get(id) as any
+    if (!order) throw new Error('Orden no encontrada o ya cerrada')
+
+    const items = db.prepare("SELECT subtotal, product_id, quantity, category_name FROM order_items WHERE order_id = ? AND item_status != 'cancelado'").all(id) as any[]
+    const subtotal = items.reduce((sum: number, i: any) => sum + i.subtotal, 0)
+    let discount = data.discount || 0
+    const activeRules = getActiveHappyHourRules(db)
+    if (activeRules.length > 0) {
+      const prodIds = db.prepare("SELECT id, category_id FROM products WHERE id IN (" + items.map(() => '?').join(',') + ")").all(...items.map((i: any) => i.product_id)) as any[]
+      const catMap = new Map(prodIds.map((p: any) => [p.id, p.category_id]))
+      const hhDiscount = items.reduce((sum: number, item: any) => {
+        const { discount: d } = applyHappyHourToItem(db, item.product_id, catMap.get(item.product_id) || null, item.subtotal / item.quantity, item.quantity)
+        return sum + d
+      }, 0)
+      if (hhDiscount > 0) discount = hhDiscount
+    }
+    const total = subtotal - discount
+    const amountPaid = data.amountPaid || total
+
+    db.transaction(() => {
+      db.prepare(`
+        UPDATE orders SET status = 'completed', subtotal = ?, discount = ?, total = ?, payment_method = ?, amount_paid = ?, "change" = ?, customer_nit = ?, completed_at = datetime('now','localtime')
+        WHERE id = ?
+      `).run(subtotal, discount, total, data.paymentMethod, amountPaid, Math.max(0, amountPaid - total), data.customerNIT || null, id)
+      db.prepare("UPDATE order_items SET item_status = 'entregado', ready_at = datetime('now','localtime') WHERE order_id = ? AND item_status NOT IN ('cancelado','entregado')").run(id)
+    })()
+    return { closed: true, total }
+  })
+
+  ipcMain.handle('orders:split-bill', (_event, sourceOrderId: number, splits: Array<{
+    itemIds: number[]
+    customerName?: string
+  }>) => {
+    sessionStore.requireActive(db, 'admin', 'employee')
+    const source = db.prepare("SELECT * FROM orders WHERE id = ? AND status = 'pending'").get(sourceOrderId) as any
+    if (!source) throw new Error('Orden origen no encontrada o ya cerrada')
+
+    const results: any[] = []
+    db.transaction(() => {
+      for (const split of splits) {
+        if (split.itemIds.length === 0) continue
+        const items = db.prepare(`SELECT * FROM order_items WHERE id IN (${split.itemIds.map(() => '?').join(',')}) AND order_id = ?`).all(...split.itemIds, sourceOrderId) as any[]
+        if (items.length === 0) continue
+
+        const subtotal = items.reduce((s: number, i: any) => s + i.subtotal, 0)
+        const orderNumber = generateOrderNumber(db)
+        const result = db.prepare(`
+          INSERT INTO orders (order_number, customer_name, service_type, table_number, subtotal, total, employee_id, status, completed_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, 'completed', datetime('now','localtime'))
+        `).run(orderNumber, split.customerName || source.customer_name, source.service_type, source.table_number, subtotal, subtotal, source.employee_id)
+        const newOrderId = result.lastInsertRowid as number
+
+        for (const item of items) {
+          db.prepare("UPDATE order_items SET order_id = ?, item_status = 'entregado', ready_at = datetime('now','localtime') WHERE id = ?").run(newOrderId, item.id)
+        }
+        results.push({ id: newOrderId, orderNumber, total: subtotal })
+      }
+    })()
+    return { splits: results }
+  })
+
+  ipcMain.handle('orders:merge-tables', (_event, sourceOrderId: number, targetOrderId: number) => {
+    sessionStore.requireActive(db, 'admin', 'employee')
+    const source = db.prepare("SELECT id, status FROM orders WHERE id = ?").get(sourceOrderId) as any
+    const target = db.prepare("SELECT id, status FROM orders WHERE id = ?").get(targetOrderId) as any
+    if (!source || !target) throw new Error('Orden no encontrada')
+    if (source.status !== 'pending' || target.status !== 'pending') throw new Error('Solo se pueden unir ordenes abiertas')
+
+    db.transaction(() => {
+      db.prepare("UPDATE order_items SET order_id = ?, item_status = 'pendiente', started_at = NULL, ready_at = NULL WHERE order_id = ? AND item_status NOT IN ('cancelado','entregado')").run(targetOrderId, sourceOrderId)
+      db.prepare("UPDATE orders SET status = 'cancelled', customer_name = customer_name || ' (unida)' WHERE id = ?").run(sourceOrderId)
+    })()
+    return { merged: true, targetOrderId }
   })
 
   function generateOrderNumber(db: Database.Database): string {

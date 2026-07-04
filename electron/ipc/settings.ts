@@ -1,12 +1,22 @@
 import { ipcMain, IpcMainInvokeEvent, safeStorage } from 'electron'
 import Database from 'better-sqlite3'
+import crypto from 'crypto'
+import { sessionStore } from '../session'
+import { logAudit } from './audit'
+
+const FALLBACK_KEY = crypto.scryptSync('quickbite-pos-fallback-key-2026', 'salt', 32)
 
 function encryptValue(value: string): string {
   if (safeStorage.isEncryptionAvailable()) {
     const encrypted = safeStorage.encryptString(value)
     return 'enc:' + encrypted.toString('base64')
   }
-  return value
+  const iv = crypto.randomBytes(16)
+  const cipher = crypto.createCipheriv('aes-256-gcm', FALLBACK_KEY, iv)
+  let enc = cipher.update(value, 'utf8', 'hex')
+  enc += cipher.final('hex')
+  const tag = cipher.getAuthTag().toString('hex')
+  return 'aes:' + iv.toString('hex') + ':' + tag + ':' + enc
 }
 
 function decryptValue(value: string): string {
@@ -16,8 +26,21 @@ function decryptValue(value: string): string {
       return safeStorage.decryptString(buf)
     } catch { return value }
   }
-  if (!safeStorage.isEncryptionAvailable()) {
-    console.warn('[settings] safeStorage no disponible — valores sensibles en texto plano')
+  if (value.startsWith('aes:')) {
+    try {
+      const parts = value.slice(4).split(':')
+      const iv = Buffer.from(parts[0], 'hex')
+      const tag = Buffer.from(parts[1], 'hex')
+      const enc = parts[2]
+      const decipher = crypto.createDecipheriv('aes-256-gcm', FALLBACK_KEY, iv)
+      decipher.setAuthTag(tag)
+      let dec = decipher.update(enc, 'hex', 'utf8')
+      dec += decipher.final('utf8')
+      return dec
+    } catch {
+      console.error('[settings] Fallback decryption failed')
+      return value
+    }
   }
   return value
 }
@@ -33,6 +56,9 @@ export function registerSettingsHandlers(ipcMain: Electron.IpcMain, db: Database
   })
 
   ipcMain.handle('settings:set', (_event: IpcMainInvokeEvent, key: string, value: string) => {
+    sessionStore.requireActive(db, 'admin')
+    const s = sessionStore.get()
+    logAudit(db, { userId: s?.id, action: 'settings_changed', entityType: 'settings', details: { key } })
     let stored = value
     if (key === 'ai_api_key' || key.endsWith('_secret') || key.endsWith('_key')) {
       stored = encryptValue(value)

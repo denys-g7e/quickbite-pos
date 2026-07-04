@@ -1,5 +1,6 @@
 import { IpcMain } from 'electron'
 import Database from 'better-sqlite3'
+import { sessionStore } from '../session'
 
 export function registerCategoryHandlers(ipcMain: IpcMain, db: Database.Database) {
   ipcMain.handle('categories:list', () => {
@@ -17,6 +18,7 @@ export function registerCategoryHandlers(ipcMain: IpcMain, db: Database.Database
     color?: string
     order?: number
   }) => {
+    sessionStore.requireActive(db, 'admin')
     console.log('categories:create called with data:', JSON.stringify(data))
     try {
       const result = db.prepare(
@@ -37,6 +39,7 @@ export function registerCategoryHandlers(ipcMain: IpcMain, db: Database.Database
     order?: number
     isActive?: boolean
   }) => {
+    sessionStore.requireActive(db, 'admin')
     const fields: string[] = []
     const params: any[] = []
 
@@ -53,6 +56,7 @@ export function registerCategoryHandlers(ipcMain: IpcMain, db: Database.Database
   })
 
   ipcMain.handle('categories:delete', (_event, id: number) => {
+    sessionStore.requireActive(db, 'admin')
     const productCount = (db.prepare('SELECT COUNT(*) as count FROM products WHERE category_id = ?').get(id) as any).count
     if (productCount > 0) {
       db.prepare('UPDATE categories SET is_active = 0 WHERE id = ?').run(id)

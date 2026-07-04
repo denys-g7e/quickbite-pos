@@ -1,11 +1,13 @@
 import { IpcMain } from 'electron'
 import Database from 'better-sqlite3'
-import crypto from 'crypto'
+import bcrypt from 'bcrypt'
+import { sessionStore } from '../session'
+import { logAudit } from './audit'
+
+const BCRYPT_ROUNDS = 12
 
 function hashPwd(password: string): string {
-  const salt = crypto.randomBytes(16).toString('hex')
-  const hash = crypto.pbkdf2Sync(password, salt, 100000, 64, 'sha512').toString('hex')
-  return `${salt}:${hash}`
+  return bcrypt.hashSync(password, BCRYPT_ROUNDS)
 }
 
 export function registerUserHandlers(ipcMain: IpcMain, db: Database.Database) {
@@ -28,6 +30,7 @@ export function registerUserHandlers(ipcMain: IpcMain, db: Database.Database) {
     pin?: string
     createdBy?: number
   }) => {
+    sessionStore.requireActive(db, 'admin')
     const hashedPassword = hashPwd(data.password)
     let hashedPin: string | null = null
     if (data.pin) {
@@ -36,6 +39,8 @@ export function registerUserHandlers(ipcMain: IpcMain, db: Database.Database) {
     const result = db.prepare(
       'INSERT INTO users (name, email, password, role, pin, created_by) VALUES (?, ?, ?, ?, ?, ?)'
     ).run(data.name, data.email, hashedPassword, data.role || 'employee', hashedPin, data.createdBy || null)
+    const session = sessionStore.get()
+    logAudit(db, { userId: session?.id, action: 'user_created', entityType: 'user', entityId: result.lastInsertRowid as number, details: { email: data.email, role: data.role || 'employee' } })
     return { id: result.lastInsertRowid }
   })
 
@@ -44,7 +49,8 @@ export function registerUserHandlers(ipcMain: IpcMain, db: Database.Database) {
     email?: string
     role?: string
     isActive?: boolean
-  }) => {
+}) => {
+    sessionStore.requireActive(db, 'admin')
     const fields: string[] = []
     const params: any[] = []
 
@@ -54,12 +60,17 @@ export function registerUserHandlers(ipcMain: IpcMain, db: Database.Database) {
     if (data.isActive !== undefined) { fields.push('is_active = ?'); params.push(data.isActive ? 1 : 0) }
 
     if (fields.length === 0) return { updated: false }
+    if (data.role !== undefined) {
+      const s = sessionStore.get()
+      logAudit(db, { userId: s?.id, action: 'role_changed', entityType: 'user', entityId: id, details: { newRole: data.role } })
+    }
     params.push(id)
     db.prepare(`UPDATE users SET ${fields.join(', ')} WHERE id = ?`).run(...params)
     return { updated: true }
   })
 
 ipcMain.handle('users:toggle-active', (_event, id: number) => {
+    sessionStore.requireActive(db, 'admin')
     const user = db.prepare('SELECT is_active FROM users WHERE id = ?').get(id) as any
     if (!user) throw new Error('Usuario no encontrado')
     const newState = user.is_active ? 0 : 1
@@ -68,12 +79,14 @@ ipcMain.handle('users:toggle-active', (_event, id: number) => {
   })
 
   ipcMain.handle('users:reset-password', (_event, id: number, password: string) => {
+    sessionStore.requireActive(db, 'admin')
     const hashed = hashPwd(password)
     db.prepare('UPDATE users SET password = ?, must_change_password = 0 WHERE id = ?').run(hashed, id)
     return { updated: true }
   })
 
   ipcMain.handle('users:delete', (_event, id: number) => {
+    sessionStore.requireActive(db, 'admin')
     db.prepare('DELETE FROM users WHERE id = ? AND role = ?').run(id, 'employee')
     return { deleted: true }
   })

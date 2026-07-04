@@ -8,21 +8,21 @@ import { useUIStore } from '../../store/uiStore'
 import { useAuthStore } from '../../store/authStore'
 import { validateNIT } from '../../lib/formatters'
 
-function isHappyHour(settings: Record<string, string>): { active: boolean; discount: number; label: string } {
-  if (settings.happy_hour_enabled !== 'true') return { active: false, discount: 0, label: '' }
-  const now = new Date()
-  const current = now.getHours() * 60 + now.getMinutes()
-  const startParts = (settings.happy_hour_start || '18:00').split(':').map(Number)
-  const endParts = (settings.happy_hour_end || '20:00').split(':').map(Number)
-  const start = startParts[0] * 60 + (startParts[1] || 0)
-  const end = endParts[0] * 60 + (endParts[1] || 0)
-  const discount = parseInt(settings.happy_hour_discount || '10', 10)
-  if (start <= end) {
-    if (current >= start && current < end) return { active: true, discount, label: `Hora Feliz (${discount}% desc.)` }
-  } else {
-    if (current >= start || current < end) return { active: true, discount, label: `Hora Feliz (${discount}% desc.)` }
+async function loadHHItemDiscounts(items: any[]): Promise<{ totalDiscount: number; labels: string[] }> {
+  try {
+    const rules = await window.api.happyHour.getActiveRules()
+    if (!rules || rules.length === 0) return { totalDiscount: 0, labels: [] }
+    let totalDiscount = 0
+    const labels = new Set<string>()
+    for (const item of items) {
+      const result = await window.api.happyHour.getProductDiscount(item.productId, null, item.productPrice, item.quantity)
+      totalDiscount += result.discount
+      if (result.discountLabel) labels.add(result.discountLabel)
+    }
+    return { totalDiscount, labels: [...labels] }
+  } catch {
+    return { totalDiscount: 0, labels: [] }
   }
-  return { active: false, discount: 0, label: '' }
 }
 
 export function PaymentModal() {
@@ -39,7 +39,7 @@ export function PaymentModal() {
   const [qrImage, setQrImage] = useState('')
   const [qrEnabled, setQrEnabled] = useState(false)
   const [qrBase64, setQrBase64] = useState('')
-  const [happyHour, setHappyHour] = useState<{ active: boolean; discount: number; label: string }>({ active: false, discount: 0, label: '' })
+  const [hhLabels, setHhLabels] = useState<string[]>([])
 
   useEffect(() => {
     window.api.settings.getAll().then(async (s) => {
@@ -52,12 +52,10 @@ export function PaymentModal() {
       } else {
         setQrBase64('')
       }
-      const hh = isHappyHour(s)
-      setHappyHour(hh)
-      if (hh.active && discount === 0) {
-        const subtotal = getSubtotal()
-        const hhDiscount = Math.round(subtotal * hh.discount) / 100
-        setDiscount(hhDiscount)
+      const { totalDiscount, labels } = await loadHHItemDiscounts(items)
+      setHhLabels(labels)
+      if (totalDiscount > 0 && discount === 0) {
+        setDiscount(totalDiscount)
       }
     }).catch(() => {})
   }, [showPaymentModal])
@@ -171,12 +169,12 @@ export function PaymentModal() {
               <span className="text-text-secondary">Subtotal</span>
               <span className="text-text-primary">Bs. {getSubtotal().toFixed(2)}</span>
             </div>
-            {discount > 0 && (
-              <div className="flex justify-between text-body-sm">
-                <span className="text-status-error">{happyHour.active ? happyHour.label : 'Descuento'}</span>
-                <span className="text-status-error">-Bs. {discount.toFixed(2)}</span>
-              </div>
-            )}
+              {discount > 0 && (
+                <div className="flex justify-between text-body-sm">
+                  <span className="text-status-error">{hhLabels.length > 0 ? hhLabels.join(', ') : 'Descuento'}</span>
+                  <span className="text-status-error">-Bs. {discount.toFixed(2)}</span>
+                </div>
+              )}
             <div className="flex justify-between text-body font-bold">
               <span className="text-text-primary">TOTAL</span>
               <span className="text-accent">Bs. {total.toFixed(2)}</span>

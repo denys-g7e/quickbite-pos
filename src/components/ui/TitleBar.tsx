@@ -1,5 +1,5 @@
 import React from 'react'
-import { Zap, Minus, Square, X } from 'lucide-react'
+import { Zap, Minus, Square, X, RefreshCw } from 'lucide-react'
 
 export function TitleBar() {
   return (
@@ -10,7 +10,15 @@ export function TitleBar() {
         </div>
         <span className="text-sm text-text-primary font-medium">QuickBite POS</span>
       </div>
-      <div className="ml-auto flex gap-1" style={{ WebkitAppRegion: 'no-drag' as any }}>
+      <div className="ml-auto flex items-center gap-1" style={{ WebkitAppRegion: 'no-drag' as any }}>
+        <button
+          onClick={() => window.api.app.restart()}
+          className="w-7 h-7 rounded-full hover:bg-white/10 flex items-center justify-center transition-colors"
+          title="Recargar app (si se congela)"
+        >
+          <RefreshCw size={12} className="text-text-muted" />
+        </button>
+        <div className="w-px h-4 bg-border-subtle mx-0.5" />
         <button
           onClick={() => window.api.app.minimize()}
           className="w-8 h-8 hover:bg-white/10 rounded flex items-center justify-center transition-colors"

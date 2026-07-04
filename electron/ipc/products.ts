@@ -1,5 +1,7 @@
 import { IpcMain } from 'electron'
 import Database from 'better-sqlite3'
+import { sessionStore } from '../session'
+import { logAudit } from './audit'
 
 interface ProductRow {
   id: number
@@ -52,6 +54,7 @@ export function registerProductHandlers(ipcMain: IpcMain, db: Database.Database)
     stock?: number
     sku?: string
   }) => {
+    sessionStore.requireActive(db, 'admin')
     console.log('products:create called with data:', JSON.stringify(data))
     try {
       const result = db.prepare(`
@@ -87,6 +90,7 @@ export function registerProductHandlers(ipcMain: IpcMain, db: Database.Database)
     stock?: number
     sku?: string
   }) => {
+    sessionStore.requireActive(db, 'admin')
     const fields: string[] = []
     const params: any[] = []
 
@@ -102,12 +106,21 @@ export function registerProductHandlers(ipcMain: IpcMain, db: Database.Database)
 
     if (fields.length === 0) return { updated: false }
 
+    const changed: string[] = []
+    if (data.price !== undefined) changed.push('price')
+    if (data.stock !== undefined) changed.push('stock')
+    if (changed.length > 0) {
+      const session = sessionStore.get()
+      logAudit(db, { userId: session?.id, action: 'product_updated', entityType: 'product', entityId: id, details: { changedFields: changed, newPrice: data.price, newStock: data.stock } })
+    }
+
     params.push(id)
     db.prepare(`UPDATE products SET ${fields.join(', ')} WHERE id = ?`).run(...params)
     return { updated: true }
   })
 
   ipcMain.handle('products:delete', (_event, id: number) => {
+    sessionStore.requireActive(db, 'admin')
     db.prepare('DELETE FROM products WHERE id = ?').run(id)
     return { deleted: true }
   })

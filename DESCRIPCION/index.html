@@ -3,143 +3,167 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>QuickBite POS — Demo</title>
+<title>QuickBite POS — Sistema de Punto de Venta</title>
 <style>
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0F1117; color: #E4E7EB; line-height: 1.5; }
-  .demo-banner { background: linear-gradient(135deg, #1a1d2e, #2563eb22); border-bottom: 1px solid #1e293b; padding: 12px 24px; display: flex; align-items: center; justify-content: space-between; }
-  .demo-banner h1 { font-size: 18px; font-weight: 700; display: flex; align-items: center; gap: 10px; }
-  .demo-banner h1 span { color: #3b82f6; }
-  .demo-banner .badge { background: #f59e0b22; color: #f59e0b; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; border: 1px solid #f59e0b44; }
-  .container { max-width: 1100px; margin: 0 auto; padding: 32px 24px; }
-  .hero { text-align: center; padding: 60px 0 40px; }
-  .hero h2 { font-size: 42px; font-weight: 800; background: linear-gradient(135deg, #3b82f6, #8b5cf6); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
-  .hero p { font-size: 18px; color: #94a3b8; margin-top: 12px; max-width: 600px; margin-inline: auto; }
-  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; margin-top: 32px; }
-  .card { background: #1a1d2e; border: 1px solid #1e293b; border-radius: 16px; padding: 24px; transition: all 0.2s; }
-  .card:hover { border-color: #3b82f644; transform: translateY(-2px); box-shadow: 0 8px 24px #00000033; }
-  .card .icon { width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center; margin-bottom: 14px; font-size: 22px; }
-  .card h3 { font-size: 15px; font-weight: 700; margin-bottom: 6px; }
-  .card p { font-size: 13px; color: #94a3b8; }
-  .section-title { font-size: 24px; font-weight: 700; margin-top: 48px; display: flex; align-items: center; gap: 10px; }
-  .section-title small { font-size: 14px; font-weight: 400; color: #64748b; }
-  .screenshots { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; margin-top: 20px; }
-  .screenshot { background: #1a1d2e; border: 1px solid #1e293b; border-radius: 12px; overflow: hidden; }
-  .screenshot .mock { background: #0F1117; padding: 20px; min-height: 180px; display: flex; flex-direction: column; gap: 12px; }
-  .screenshot .mock .bar { height: 8px; background: #1e293b; border-radius: 4px; width: 100%; }
-  .screenshot .mock .bar:nth-child(1) { width: 60%; }
-  .screenshot .mock .bar:nth-child(2) { width: 80%; }
-  .screenshot .mock .bar:nth-child(3) { width: 40%; }
-  .screenshot .mock .row { display: flex; gap: 8px; }
-  .screenshot .mock .row .bar { flex: 1; }
-  .screenshot .mock .box { background: #1e293b; border-radius: 8px; padding: 12px; }
-  .screenshot .mock .box .row { display: flex; justify-content: space-between; }
-  .screenshot .mock .box .row span { font-size: 11px; color: #64748b; }
-  .screenshot .caption { padding: 12px 16px; font-size: 13px; color: #94a3b8; border-top: 1px solid #1e293b; font-weight: 500; }
-  .feature-list { margin-top: 16px; display: grid; gap: 10px; }
-  .feature-list li { list-style: none; display: flex; align-items: start; gap: 10px; font-size: 14px; color: #cbd5e1; padding: 8px 12px; background: #1a1d2e; border-radius: 8px; border: 1px solid #1e293b; }
-  .feature-list li::before { content: '✓'; color: #22c55e; font-weight: 700; }
-  .tech-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-top: 16px; }
-  .tech-item { background: #1a1d2e; border: 1px solid #1e293b; border-radius: 10px; padding: 16px; text-align: center; }
-  .tech-item .logo { font-size: 28px; margin-bottom: 6px; }
-  .tech-item span { font-size: 12px; color: #94a3b8; font-weight: 600; }
-  .qr-box { background: #1a1d2e; border: 1px solid #1e293b; border-radius: 16px; padding: 32px; text-align: center; margin-top: 20px; }
-  .qr-box .qr-placeholder { width: 160px; height: 160px; margin: 16px auto; background: #fff; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 80px; color: #000; border: 2px dashed #1e293b; }
-  .qr-box p { color: #94a3b8; font-size: 14px; }
-  .footer { text-align: center; padding: 40px 24px; color: #475569; font-size: 13px; border-top: 1px solid #1e293b; margin-top: 48px; }
-  @media (max-width: 600px) { .hero h2 { font-size: 28px; } .grid { grid-template-columns: 1fr; } }
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--bg:#0F1117;--bg2:#13161F;--bg3:#1A1D27;--bd:rgba(255,255,255,0.06);--bd2:rgba(255,255,255,0.10);--tx:#FFFFFF;--tx2:rgba(255,255,255,0.6);--tx3:rgba(255,255,255,0.3);--tx4:rgba(255,255,255,0.15);--ac:#FF6B35;--ach:#E85E2A;--acm:rgba(255,107,53,0.12);--sc:#4CAF50;--wn:#FF9800;--er:#f44336;--if:#2196F3;--font:Inter,system-ui,-apple-system,sans-serif}
+body{font-family:var(--font);background:var(--bg);color:var(--tx);line-height:1.6;-webkit-font-smoothing:antialiased}
+.container{max-width:1100px;margin:0 auto;padding:0 24px}
+.banner{background:var(--bg2);border-bottom:1px solid var(--bd);padding:14px 24px;display:flex;align-items:center;justify-content:space-between}
+.banner .l{display:flex;align-items:center;gap:10px}
+.banner .l .z{width:32px;height:32px;background:var(--ac);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;color:#fff}
+.banner .l h1{font-size:17px;font-weight:700}
+.banner .l h1 span{color:var(--ac)}
+.banner .bdg{padding:4px 14px;border-radius:20px;font-size:12px;font-weight:600;background:var(--acm);color:var(--ac);border:1px solid rgba(255,107,53,.25)}
+.hero{text-align:center;padding:80px 0 48px}
+.hero h2{font-size:44px;font-weight:800;background:linear-gradient(135deg,var(--ac),#8b5cf6);-webkit-background-clip:text;-webkit-text-fill-color:transparent;line-height:1.2}
+.hero p{font-size:18px;color:var(--tx2);margin-top:14px;max-width:620px;margin-inline:auto}
+.hero .creds{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-top:20px}
+.hero .creds span{padding:8px 18px;border-radius:8px;font-size:13px;font-weight:600}
+.hero .creds .u{background:var(--ac);color:#fff}
+.hero .creds .p{background:var(--bg3);color:var(--tx2);border:1px solid var(--bd2)}
+.hero .creds .c{background:var(--bg3);color:var(--wn);border:1px solid rgba(255,152,0,.3)}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:14px;margin-top:32px}
+.card{background:var(--bg3);border:1px solid var(--bd);border-radius:14px;padding:24px;transition:all .2s}
+.card:hover{border-color:rgba(255,107,53,.3);transform:translateY(-2px);box-shadow:0 8px 24px rgba(0,0,0,.3)}
+.card .ic{width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;margin-bottom:14px;font-size:22px}
+.card h3{font-size:15px;font-weight:700;margin-bottom:6px}
+.card p{font-size:13px;color:var(--tx2)}
+.section-title{font-size:24px;font-weight:700;margin-top:56px;display:flex;align-items:center;gap:10px;padding-bottom:8px;border-bottom:1px solid var(--bd)}
+.section-title small{font-size:14px;font-weight:400;color:var(--tx3)}
+.screenshots{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px;margin-top:20px}
+.screenshot{background:var(--bg3);border:1px solid var(--bd);border-radius:12px;overflow:hidden}
+.screenshot .mock{background:var(--bg);padding:20px;min-height:180px;display:flex;flex-direction:column;gap:12px}
+.screenshot .mock .bar{height:8px;background:var(--bg3);border-radius:4px;width:100%}
+.screenshot .mock .bar:nth-child(1){width:60%}
+.screenshot .mock .bar:nth-child(2){width:80%}
+.screenshot .mock .bar:nth-child(3){width:40%}
+.screenshot .mock .row{display:flex;gap:8px}
+.screenshot .mock .row .bar{flex:1}
+.screenshot .mock .box{background:var(--bg3);border:1px solid var(--bd);border-radius:8px;padding:12px}
+.screenshot .mock .box .row{display:flex;justify-content:space-between}
+.screenshot .mock .box .row span{font-size:11px;color:var(--tx3)}
+.screenshot .caption{padding:12px 16px;font-size:13px;color:var(--tx2);border-top:1px solid var(--bd);font-weight:500}
+.feature-list{margin-top:16px;display:grid;gap:10px}
+.feature-list li{list-style:none;display:flex;align-items:start;gap:10px;font-size:14px;color:#cbd5e1;padding:10px 14px;background:var(--bg3);border-radius:8px;border:1px solid var(--bd)}
+.feature-list li::before{content:'✓';color:var(--sc);font-weight:700;flex-shrink:0}
+.tech-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px;margin-top:16px}
+.tech-item{background:var(--bg3);border:1px solid var(--bd);border-radius:10px;padding:18px;text-align:center}
+.tech-item .logo{font-size:28px;margin-bottom:6px}
+.tech-item span{font-size:12px;color:var(--tx2);font-weight:600}
+.dist-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:16px}
+.cta{background:linear-gradient(135deg,rgba(255,107,53,.08),rgba(139,92,246,.08));border:1px solid rgba(255,107,53,.25);border-radius:16px;padding:40px;text-align:center;margin-top:32px}
+.cta .big{font-size:40px}
+.cta h3{margin-top:12px;font-size:20px}
+.cta p{color:var(--tx2);margin-top:6px}
+.cta .creds{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-top:16px}
+.cta .creds span{padding:8px 20px;border-radius:8px;font-weight:600;font-size:14px}
+.cta .creds .u{background:var(--ac);color:#fff}
+.cta .creds .p{background:var(--bg3);color:var(--tx2);border:1px solid var(--bd2)}
+.cta .creds .c{background:var(--bg3);color:var(--wn);border:1px solid rgba(255,152,0,.3)}
+.footer{text-align:center;padding:40px 24px;color:var(--tx4);font-size:13px;border-top:1px solid var(--bd);margin-top:56px}
+@media(max-width:600px){.hero h2{font-size:28px}.grid{grid-template-columns:1fr}.dist-grid{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
-<div class="demo-banner">
-  <h1>⚡ <span>QuickBite</span> POS</h1>
-  <span class="badge">MODO DEMO</span>
+
+<div class="banner">
+  <div class="l">
+    <div class="z">⚡</div>
+    <h1><span>QuickBite</span> POS</h1>
+  </div>
+  <span class="bdg">v2.0.0</span>
 </div>
 
 <div class="container">
   <div class="hero">
-    <h2>Sistema de Punto de Venta</h2>
-    <p>Todo en uno — Escritorio + Móvil. Offline nativo, impresión térmica, IA, QR, turnos de caja y más.</p>
+    <h2>Sistema de Punto de Venta Profesional</h2>
+    <p>Todo en uno — Offline nativo, impresión térmica, dashboard, IA, QR, turnos de caja y más. Diseñado para restaurantes en Bolivia.</p>
+    <div class="creds">
+      <span class="u">admin@quickbite.com</span>
+      <span class="p">admin123</span>
+      <span class="c">Código: denys123</span>
+    </div>
   </div>
 
   <div class="grid">
     <div class="card">
-      <div class="icon" style="background:#3b82f622;color:#3b82f6;">⚡</div>
+      <div class="ic" style="background:#FF6B3522;color:#FF6B35;">⚡</div>
       <h3>POS Rápido</h3>
-      <p>Interfaz táctil optimizada para cobro express. Agrega productos en segundos.</p>
+      <p>Interfaz táctil optimizada para cobro express. Agrega productos en segundos con búsqueda instantánea.</p>
     </div>
     <div class="card">
-      <div class="icon" style="background:#8b5cf622;color:#8b5cf6;">🧠</div>
+      <div class="ic" style="background:#8b5cf622;color:#8b5cf6;">🧠</div>
       <h3>Asistente IA</h3>
       <p>Integración con Groq AI. Consulta ventas, productos o genera reportes con lenguaje natural.</p>
     </div>
     <div class="card">
-      <div class="icon" style="background:#22c55e22;color:#22c55e;">📱</div>
-      <h3>App Móvil</h3>
-      <p>App Android con Capacitor + SQL.js. Toma órdenes desde cualquier lugar.</p>
-    </div>
-    <div class="card">
-      <div class="icon" style="background:#f59e0b22;color:#f59e0b;">🖨️</div>
+      <div class="ic" style="background:#22c55e22;color:#22c55e;">🖨️</div>
       <h3>Impresión Térmica</h3>
-      <p>Ticket cliente + comanda cocina. Dos estaciones: Cocina y Barra.</p>
+      <p>Ticket cliente + comanda cocina. Dos estaciones: Cocina (platos) y Barra (bebidas) con ESC/POS.</p>
     </div>
     <div class="card">
-      <div class="icon" style="background:#06b6d422;color:#06b6d4;">📊</div>
+      <div class="ic" style="background:#06b6d422;color:#06b6d4;">📊</div>
       <h3>Dashboard & Estadísticas</h3>
-      <p>Ventas del día, top productos, métodos de pago, ingresos por hora y más.</p>
+      <p>Ventas del día, top productos, métodos de pago, ingresos por hora, ticket promedio y más.</p>
     </div>
     <div class="card">
-      <div class="icon" style="background:#ec489922;color:#ec4899;">💵</div>
+      <div class="ic" style="background:#ec489922;color:#ec4899;">💵</div>
       <h3>Turno de Caja</h3>
-      <p>Apertura y cierre con monto. Control de ingresos por turno.</p>
+      <p>Apertura y cierre con monto. Control de ingresos por turno con historial completo.</p>
     </div>
     <div class="card">
-      <div class="icon" style="background:#10b98122;color:#10b981;">📄</div>
+      <div class="ic" style="background:#10b98122;color:#10b981;">📄</div>
       <h3>Exportación SIN</h3>
-      <p>Exporta ventas a formato SIN (XLSX + TXT) en ZIP. Listo para contabilidad.</p>
+      <p>Exporta ventas a formato SIN (XLSX + TXT) en ZIP. Listo para contabilidad boliviana.</p>
     </div>
     <div class="card">
-      <div class="icon" style="background:#f9731622;color:#f97316;">🏷️</div>
-      <h3>Happy Hour</h3>
-      <p>Descuento automático en horario configurable. Actívalo desde Settings.</p>
+      <div class="ic" style="background:#f9731622;color:#f97316;">🏷️</div>
+      <h3>Happy Hour Inteligente</h3>
+      <p>Reglas por categoría, producto o 2x1 con horarios y días configurables. Descuento automático.</p>
     </div>
     <div class="card">
-      <div class="icon" style="background:#6366f122;color:#6366f1;">🔔</div>
+      <div class="ic" style="background:#6366f122;color:#6366f1;">🔔</div>
       <h3>Alertas Stock Bajo</h3>
-      <p>Notificación visual cuando un producto está por debajo del umbral mínimo.</p>
+      <p>Notificación visual cuando un producto está por debajo del umbral mínimo configurable.</p>
     </div>
     <div class="card">
-      <div class="icon" style="background:#14b8a622;color:#14b8a6;">👤</div>
+      <div class="ic" style="background:#14b8a622;color:#14b8a6;">👤</div>
       <h3>Clientes Frecuentes</h3>
-      <p>Detección automática de visitas repetidas. Muestra "Cliente Frecuente" en POS.</p>
+      <p>Detección automática de visitas repetidas. Muestra "Cliente Frecuente" en POS con contador.</p>
     </div>
     <div class="card">
-      <div class="icon" style="background:#e11d4822;color:#e11d48;">🛒</div>
+      <div class="ic" style="background:#e11d4822;color:#e11d48;">🛒</div>
       <h3>Delivery & Mesas</h3>
-      <p>Soporte para servicio en mesa, para llevar y delivery con mapa de mesas 4x4.</p>
+      <p>Soporte para servicio en mesa, para llevar y delivery. Divide cuentas y une mesas.</p>
     </div>
     <div class="card">
-      <div class="icon" style="background:#7c3aed22;color:#7c3aed;">📦</div>
+      <div class="ic" style="background:#7c3aed22;color:#7c3aed;">📦</div>
       <h3>Productos con Foto</h3>
-      <p>Sube imágenes de productos desde el panel. Se muestran en el POS y app móvil.</p>
+      <p>Sube imágenes de productos desde el panel. Se muestran en el POS y ayudan al mesero.</p>
+    </div>
+    <div class="card">
+      <div class="ic" style="background:#2196F322;color:#2196F3;">🍳</div>
+      <h3>KDS — Pantalla Cocina</h3>
+      <p>Sistema de display para cocina con estados: pendiente → cocina/barra → listo → entregado.</p>
     </div>
   </div>
 
-  <h2 class="section-title">📸 <span>Pantallas del Sistema</span> <small>interfaz real</small></h2>
+  <h2 class="section-title">📸 Pantallas del Sistema <small>interfaz real</small></h2>
   <div class="screenshots">
     <div class="screenshot">
       <div class="mock">
         <div class="box">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
             <span style="font-size:13px;font-weight:600;">Nueva orden</span>
-            <span style="font-size:11px;background:#3b82f622;color:#3b82f6;padding:2px 8px;border-radius:4px;">Turno activo</span>
+            <span style="font-size:11px;background:#FF6B3522;color:#FF6B35;padding:2px 8px;border-radius:4px;">Turno activo</span>
           </div>
-          <div class="row"><div class="bar"></div><span style="font-size:10px;color:#475569;">Bs. 25</span></div>
-          <div class="row" style="margin-top:6px;"><div class="bar" style="width:70%;"></div><span style="font-size:10px;color:#475569;">Bs. 18</span></div>
-          <div class="row" style="margin-top:6px;"><div class="bar" style="width:50%;"></div><span style="font-size:10px;color:#475569;">Bs. 32</span></div>
-          <div style="margin-top:12px;padding-top:10px;border-top:1px solid #1e293b;display:flex;justify-content:space-between;">
-            <span style="font-size:12px;color:#64748b;">Total</span>
-            <span style="font-size:16px;font-weight:700;color:#3b82f6;">Bs. 75.00</span>
+          <div class="row"><div class="bar"></div><span style="font-size:10px;color:var(--tx4);">Bs. 25</span></div>
+          <div class="row" style="margin-top:6px"><div class="bar" style="width:70%"></div><span style="font-size:10px;color:var(--tx4);">Bs. 18</span></div>
+          <div class="row" style="margin-top:6px"><div class="bar" style="width:50%"></div><span style="font-size:10px;color:var(--tx4);">Bs. 32</span></div>
+          <div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--bd);display:flex;justify-content:space-between">
+            <span style="font-size:12px;color:var(--tx3);">Total</span>
+            <span style="font-size:16px;font-weight:700;color:#FF6B35;">Bs. 75.00</span>
           </div>
         </div>
       </div>
@@ -147,18 +171,18 @@
     </div>
     <div class="screenshot">
       <div class="mock">
-        <div style="display:flex;gap:16px;">
-          <div style="flex:1;">
-            <span style="font-size:11px;color:#3b82f6;font-weight:600;">📊 Dashboard</span>
-            <div class="box" style="margin-top:8px;">
-              <div style="display:flex;justify-content:space-between;"><span style="font-size:10px;color:#64748b;">Ventas hoy</span><span style="font-size:14px;font-weight:700;color:#22c55e;">Bs. 1,250</span></div>
-              <div style="display:flex;justify-content:space-between;margin-top:6px;"><span style="font-size:10px;color:#64748b;">Órdenes</span><span style="font-size:14px;font-weight:700;">24</span></div>
+        <div style="display:flex;gap:16px">
+          <div style="flex:1">
+            <span style="font-size:11px;color:#FF6B35;font-weight:600;">📊 Dashboard</span>
+            <div class="box" style="margin-top:8px">
+              <div style="display:flex;justify-content:space-between"><span style="font-size:10px;color:var(--tx3);">Ventas hoy</span><span style="font-size:14px;font-weight:700;color:#22c55e;">Bs. 1,250</span></div>
+              <div style="display:flex;justify-content:space-between;margin-top:6px"><span style="font-size:10px;color:var(--tx3);">Órdenes</span><span style="font-size:14px;font-weight:700;">24</span></div>
             </div>
           </div>
-          <div style="flex:1;">
-            <span style="font-size:11px;color:#f59e0b;font-weight:600;">⚠️ Alertas</span>
-            <div class="box" style="margin-top:8px;">
-              <span style="font-size:10px;color:#f59e0b;">Stock bajo: Coca Cola (2)</span>
+          <div style="flex:1">
+            <span style="font-size:11px;color:#FF9800;font-weight:600;">⚠️ Alertas</span>
+            <div class="box" style="margin-top:8px">
+              <span style="font-size:10px;color:#FF9800;">Stock bajo: Coca Cola (2)</span>
             </div>
           </div>
         </div>
@@ -168,14 +192,14 @@
     <div class="screenshot">
       <div class="mock">
         <div class="box">
-          <div style="display:flex;justify-content:space-between;align-items:center;">
+          <div style="display:flex;justify-content:space-between;align-items:center">
             <span style="font-size:12px;font-weight:600;">🧠 Asistente IA</span>
             <span style="font-size:10px;color:#8b5cf6;background:#8b5cf622;padding:2px 6px;border-radius:4px;">Groq</span>
           </div>
-          <div style="margin-top:10px;background:#0F1117;border-radius:8px;padding:10px;font-size:11px;color:#94a3b8;">
+          <div style="margin-top:10px;background:var(--bg);border-radius:8px;padding:10px;font-size:11px;color:var(--tx2);">
             <span style="color:#8b5cf6;">Tú:</span> ¿Cuánto se vendió ayer?
           </div>
-          <div style="margin-top:6px;background:#1e293b;border-radius:8px;padding:10px;font-size:11px;color:#94a3b8;">
+          <div style="margin-top:6px;background:var(--bg3);border:1px solid var(--bd);border-radius:8px;padding:10px;font-size:11px;color:var(--tx2);">
             <span style="color:#22c55e;">IA:</span> Ayer se vendió Bs. 2,340 con 18 órdenes completadas.
           </div>
         </div>
@@ -184,32 +208,32 @@
     </div>
   </div>
 
-  <h2 class="section-title">🛠️ <span>Tecnologías</span></h2>
+  <h2 class="section-title">🛠️ Tecnologías</h2>
   <div class="tech-grid">
-    <div class="tech-item"><div class="logo">⚛️</div><span>React 18</span></div>
+    <div class="tech-item"><div class="logo">⚛️</div><span>React 19</span></div>
     <div class="tech-item"><div class="logo">⚡</div><span>Electron</span></div>
     <div class="tech-item"><div class="logo">🗄️</div><span>SQLite</span></div>
-    <div class="tech-item"><div class="logo">📱</div><span>Capacitor</span></div>
     <div class="tech-item"><div class="logo">🎨</div><span>Tailwind</span></div>
     <div class="tech-item"><div class="logo">🧠</div><span>Groq AI</span></div>
     <div class="tech-item"><div class="logo">📦</div><span>Vite</span></div>
     <div class="tech-item"><div class="logo">🖨️</div><span>ESC/POS</span></div>
+    <div class="tech-item"><div class="logo">🔐</div><span>bcrypt</span></div>
   </div>
 
-  <h2 class="section-title">✅ <span>Características Completas</span></h2>
+  <h2 class="section-title">✅ Características Completas</h2>
   <ul class="feature-list">
     <li>POS offline nativo con Electron + SQLite — sin internet, sin problemas</li>
-    <li>App móvil Android con Capacitor + SQL.js — toma pedidos desde la mesa</li>
     <li>Impresión térmica con dos estaciones: Cocina (platos) y Barra (bebidas)</li>
     <li>Asistente IA con Groq — pregunta en lenguaje natural sobre ventas, productos, etc.</li>
+    <li>KDS — Pantalla táctil para cocina con estados en tiempo real y polling 3s</li>
     <li>Pago con QR — muestra código QR para pago electrónico</li>
     <li>Dashboard con gráficos: ventas por hora, top productos, métodos de pago</li>
     <li>Turno de caja con apertura/cierre y montos</li>
     <li>Exportación SIN — XLSX + TXT en ZIP para contabilidad boliviana</li>
-    <li>Mapa de mesas 4x4 — arrastra y asigna pedidos</li>
+    <li>Mapa de mesas — divide cuentas y une mesas fácilmente</li>
     <li>Clientes frecuentes — detección automática de visitas repetidas</li>
     <li>Alertas de stock bajo — notificación visual en dashboard</li>
-    <li>Happy Hour — descuento automático en horario configurable</li>
+    <li>Happy Hour con reglas avanzadas por categoría, producto, 2x1 y horarios</li>
     <li>Productos con foto — sube imágenes desde el panel</li>
     <li>Sistema de usuarios: admin + empleados con PIN rápido</li>
     <li>Exportación DB — respaldo y restauración de base de datos</li>
@@ -220,79 +244,40 @@
     <li>Modo oscuro nativo — interfaz moderna y elegante</li>
   </ul>
 
-  <h2 class="section-title">📱 <span>App Móvil</span></h2>
-  <div class="screenshots">
-    <div class="screenshot">
-      <div class="mock" style="min-height:120px;">
-        <div style="display:flex;gap:12px;align-items:center;">
-          <div style="width:50px;height:50px;background:#1e293b;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:24px;">📱</div>
-          <div><span style="font-weight:600;">QuickBite POS Mobile</span><br><span style="font-size:11px;color:#64748b;">Capacitor + SQL.js</span></div>
-        </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-top:12px;">
-          <div style="background:#1e293b;border-radius:6px;padding:8px;text-align:center;"><span style="font-size:10px;">🍔</span><br><span style="font-size:9px;color:#64748b;">Hamburguesas</span></div>
-          <div style="background:#1e293b;border-radius:6px;padding:8px;text-align:center;"><span style="font-size:10px;">🥤</span><br><span style="font-size:9px;color:#64748b;">Bebidas</span></div>
-          <div style="background:#1e293b;border-radius:6px;padding:8px;text-align:center;"><span style="font-size:10px;">🍟</span><br><span style="font-size:9px;color:#64748b;">Extras</span></div>
-        </div>
-      </div>
-      <div class="caption">App móvil con las mismas funcionalidades del escritorio</div>
-    </div>
-    <div class="screenshot">
-      <div class="mock" style="min-height:120px;">
-        <div class="box">
-          <span style="font-size:11px;font-weight:600;">APK generada vía GitHub Actions</span>
-          <div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap;">
-            <span style="background:#1e293b;padding:4px 8px;border-radius:4px;font-size:10px;">app-debug.apk</span>
-            <span style="background:#1e293b;padding:4px 8px;border-radius:4px;font-size:10px;">3.8 MB</span>
-            <span style="background:#1e293b;padding:4px 8px;border-radius:4px;font-size:10px;">API 24+</span>
-          </div>
-          <div style="margin-top:10px;font-size:11px;color:#94a3b8;">Build automatizado con Gradle. Descarga directa desde Actions.</div>
-        </div>
-      </div>
-      <div class="caption">🚀 APK compilada con GitHub Actions</div>
-    </div>
-  </div>
-
-  <h2 class="section-title">📦 <span>Distribución</span></h2>
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:16px;">
-    <div class="card" style="text-align:center;">
-      <div style="font-size:32px;margin-bottom:8px;">📀</div>
+  <h2 class="section-title">📦 Distribución</h2>
+  <div class="dist-grid">
+    <div class="card" style="text-align:center">
+      <div style="font-size:32px;margin-bottom:8px">📀</div>
       <h3>Instalador NSIS</h3>
-      <p style="font-size:12px;">QuickBite POS-Setup-2.0.0.exe — 87 MB</p>
+      <p style="font-size:12px">QuickBite POS-Setup-2.0.0.exe — Instalación guiada</p>
     </div>
-    <div class="card" style="text-align:center;">
-      <div style="font-size:32px;margin-bottom:8px;">💾</div>
+    <div class="card" style="text-align:center">
+      <div style="font-size:32px;margin-bottom:8px">💾</div>
       <h3>Versión Portable</h3>
-      <p style="font-size:12px;">QuickBite POS-Portable-2.0.0.exe — 87 MB</p>
+      <p style="font-size:12px">QuickBite POS-Portable-2.0.0.exe — Sin instalación</p>
     </div>
   </div>
 
-  <h2 class="section-title">🔐 <span>Seguridad</span></h2>
+  <h2 class="section-title">🔐 Seguridad</h2>
   <ul class="feature-list">
     <li>Sistema de activación por código único — protege tu inversión</li>
     <li>Roles: Admin (control total) y Empleado (solo POS y pedidos)</li>
     <li>Inicio de sesión con PIN rápido para empleados</li>
+    <li>Contraseñas hasheadas con bcrypt-12 rounds</li>
     <li>Cierre automático por inactividad configurable</li>
-    <li>Base de datos local encriptada con WAL mode</li>
+    <li>Base de datos local con WAL mode y encriptación de claves</li>
     <li>Verificación de NIT válido para facturación boliviana</li>
+    <li> Auditoría de acciones: inicio sesión, cancelaciones, cambios de precio</li>
   </ul>
 
-  <h2 class="section-title">💳 <span>Pago QR</span></h2>
-  <div class="qr-box">
-    <div class="qr-placeholder">⬛</div>
-    <p>Escanea con tu app bancaria para pagar</p>
-    <p style="font-size:12px;color:#475569;margin-top:6px;">Configura tu imagen QR desde el panel de administración</p>
-  </div>
-
-  <div style="margin-top:32px;text-align:center;">
-    <div style="background:linear-gradient(135deg,#3b82f622,#8b5cf622);border:1px solid #3b82f644;border-radius:16px;padding:32px;">
-      <span style="font-size:40px;">🚀</span>
-      <h3 style="margin-top:12px;font-size:20px;">¿Listo para empezar?</h3>
-      <p style="color:#94a3b8;margin-top:6px;">QuickBite POS está listo para instalar y usar.</p>
-      <div style="margin-top:16px;display:flex;gap:12px;justify-content:center;flex-wrap:wrap;">
-        <span style="background:#3b82f6;color:#fff;padding:8px 20px;border-radius:8px;font-weight:600;font-size:14px;">Usuario: admin@quickbite.com</span>
-        <span style="background:#1e293b;color:#94a3b8;padding:8px 20px;border-radius:8px;font-weight:600;font-size:14px;">Clave: admin123</span>
-        <span style="background:#1e293b;color:#f59e0b;padding:8px 20px;border-radius:8px;font-weight:600;font-size:14px;">Código: denys123</span>
-      </div>
+  <div class="cta">
+    <div class="big">🚀</div>
+    <h3>¿Listo para empezar?</h3>
+    <p>QuickBite POS está listo para instalar y usar en tu restaurante.</p>
+    <div class="creds">
+      <span class="u">admin@quickbite.com</span>
+      <span class="p">admin123</span>
+      <span class="c">Código: denys123</span>
     </div>
   </div>
 </div>

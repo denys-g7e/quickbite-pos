@@ -4,7 +4,7 @@ import { Card } from '../../components/ui/Card'
 import { Input } from '../../components/ui/Input'
 import { Button } from '../../components/ui/Button'
 import { Badge } from '../../components/ui/Badge'
-import { Save, Printer, Key, Database, Download, Upload, Eye, EyeOff, CheckCircle2, Image as ImageIcon, QrCode, Palette, Trash2, Monitor, FileText, Clock, Gift, Smartphone, Heart, Mail } from 'lucide-react'
+import { Save, Printer, Key, Database, Download, Upload, Eye, EyeOff, CheckCircle2, Image as ImageIcon, QrCode, Palette, Trash2, Monitor, FileText, Clock, Gift, Smartphone, Heart, Mail, Plus, Zap, X } from 'lucide-react'
 
 export default function Settings() {
   const [settings, setSettings] = useState<Record<string, string>>({})
@@ -26,6 +26,15 @@ export default function Settings() {
   const [purgeCount, setPurgeCount] = useState(0)
   const [purging, setPurging] = useState(false)
   const [purged, setPurged] = useState(false)
+  const [hhRules, setHhRules] = useState<any[]>([])
+  const [showNewHHModal, setShowNewHHModal] = useState(false)
+  const [newHHRule, setNewHHRule] = useState({
+    name: '', days: [1, 2, 3, 4, 5, 6, 0], timeStart: '18:00', timeEnd: '20:00',
+    discountType: 'percentage', discountValue: 10, categoryId: null as number | null,
+    productId: null as number | null, minQuantity: 1, priority: 0,
+  })
+  const [categories, setCategories] = useState<any[]>([])
+  const [products, setProducts] = useState<any[]>([])
 
   useEffect(() => {
     if (settings.qr_image) {
@@ -49,6 +58,12 @@ export default function Settings() {
       setSettings(all)
       const list = await window.api.printer.getPrinters()
       setPrinters(list)
+      const rules = await window.api.happyHour.listRules()
+      setHhRules(rules)
+      const cats = await window.api.categories.list()
+      setCategories(cats)
+      const prods = await window.api.products.list({ activeOnly: true })
+      setProducts(prods)
     } catch (err) { console.error(err) }
     finally { setLoading(false) }
   }
@@ -183,21 +198,129 @@ export default function Settings() {
             Hora Feliz
           </h3>
           <div className="space-y-4">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between mb-2">
               <div>
-                <p className="text-body-sm font-medium text-text-primary">Activar hora feliz</p>
-                <p className="text-label text-text-muted">Descuento automático en horario configurado</p>
+                <p className="text-body-sm font-medium text-text-primary">Descuentos por hora feliz</p>
+                <p className="text-label text-text-muted">Las reglas activas se aplican automáticamente al cobrar</p>
               </div>
-              <label className="relative inline-flex items-center cursor-pointer">
-                <input type="checkbox" className="sr-only peer" checked={settings.happy_hour_enabled === 'true'} onChange={(e) => updateSetting('happy_hour_enabled', e.target.checked ? 'true' : 'false')} />
-                <div className="w-10 h-5 bg-bg-tertiary rounded-full peer peer-checked:bg-accent after:content-[''] after:absolute after:top-[3px] after:left-[3px] after:bg-white after:rounded-full after:h-3.5 after:w-3.5 after:transition-all peer-checked:after:translate-x-5" />
-              </label>
+              <Button size="sm" onClick={() => setShowNewHHModal(true)}>
+                <Plus size={14} className="mr-1" />Nueva regla
+              </Button>
             </div>
-            {settings.happy_hour_enabled === 'true' && (
-              <div className="grid grid-cols-3 gap-3">
-                <Input label="Hora inicio (HH:mm)" placeholder="18:00" value={settings.happy_hour_start || '18:00'} onChange={(e) => updateSetting('happy_hour_start', e.target.value)} />
-                <Input label="Hora fin (HH:mm)" placeholder="20:00" value={settings.happy_hour_end || '20:00'} onChange={(e) => updateSetting('happy_hour_end', e.target.value)} />
-                <Input label="Descuento %" type="number" placeholder="10" value={settings.happy_hour_discount || '10'} onChange={(e) => updateSetting('happy_hour_discount', e.target.value)} />
+
+            {showNewHHModal && (
+              <div className="bg-bg-tertiary rounded-xl p-4 border border-border-subtle space-y-3">
+                <h4 className="text-body-sm font-semibold text-text-primary">Nueva regla de hora feliz</h4>
+                <div className="grid grid-cols-2 gap-3">
+                  <Input label="Nombre" placeholder="Ej: 2x1 Cervezas" value={newHHRule.name} onChange={(e) => setNewHHRule({ ...newHHRule, name: e.target.value })} />
+                  <div>
+                    <label className="block text-label font-medium text-text-secondary mb-1.5">Tipo descuento</label>
+                    <select className="w-full bg-bg-secondary border border-border-light rounded-lg px-3 py-2.5 text-body-sm text-text-primary focus:outline-none focus:border-accent" value={newHHRule.discountType} onChange={(e) => setNewHHRule({ ...newHHRule, discountType: e.target.value })}>
+                      <option value="percentage">Porcentaje (%)</option>
+                      <option value="fixed">Monto fijo (Bs)</option>
+                      <option value="2x1">2x1 / Lleva N paga M</option>
+                    </select>
+                  </div>
+                  <Input label={newHHRule.discountType === 'percentage' ? 'Descuento %' : newHHRule.discountType === 'fixed' ? 'Descuento Bs' : 'Cantidad mínima'} type="number" placeholder="10" value={newHHRule.discountValue} onChange={(e) => setNewHHRule({ ...newHHRule, discountValue: parseFloat(e.target.value) || 0 })} />
+                  <Input label="Hora inicio" placeholder="18:00" value={newHHRule.timeStart} onChange={(e) => setNewHHRule({ ...newHHRule, timeStart: e.target.value })} />
+                  <Input label="Hora fin" placeholder="20:00" value={newHHRule.timeEnd} onChange={(e) => setNewHHRule({ ...newHHRule, timeEnd: e.target.value })} />
+                  <div>
+                    <label className="block text-label font-medium text-text-secondary mb-1.5">Aplicar a categoría</label>
+                    <select className="w-full bg-bg-secondary border border-border-light rounded-lg px-3 py-2.5 text-body-sm text-text-primary focus:outline-none focus:border-accent" value={newHHRule.categoryId || ''} onChange={(e) => setNewHHRule({ ...newHHRule, categoryId: e.target.value ? parseInt(e.target.value) : null, productId: null })}>
+                      <option value="">Todas las categorías</option>
+                      {categories.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-label font-medium text-text-secondary mb-1.5">O a producto específico</label>
+                    <select className="w-full bg-bg-secondary border border-border-light rounded-lg px-3 py-2.5 text-body-sm text-text-primary focus:outline-none focus:border-accent" value={newHHRule.productId || ''} onChange={(e) => setNewHHRule({ ...newHHRule, productId: e.target.value ? parseInt(e.target.value) : null, categoryId: null })}>
+                      <option value="">Todos los productos</option>
+                      {products.map((p: any) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                    </select>
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-label font-medium text-text-secondary mb-1.5">Días de la semana</label>
+                  <div className="flex gap-2">
+                    {['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'].map((day, i) => (
+                      <button key={i} onClick={() => {
+                        const days = newHHRule.days.includes(i) ? newHHRule.days.filter((d: number) => d !== i) : [...newHHRule.days, i]
+                        setNewHHRule({ ...newHHRule, days })
+                      }} className={`px-3 py-1.5 text-label rounded-lg border transition-all ${newHHRule.days.includes(i) ? 'bg-accent text-white border-accent' : 'bg-bg-secondary text-text-secondary border-border-light hover:border-accent'}`}>
+                        {day}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="flex gap-2 pt-2">
+                  <Button variant="secondary" size="sm" onClick={() => setShowNewHHModal(false)}>Cancelar</Button>
+                  <Button size="sm" onClick={async () => {
+                    if (!newHHRule.name.trim()) return
+                    await window.api.happyHour.createRule({
+                      name: newHHRule.name, days: newHHRule.days, timeStart: newHHRule.timeStart,
+                      timeEnd: newHHRule.timeEnd, discountType: newHHRule.discountType,
+                      discountValue: newHHRule.discountValue, categoryId: newHHRule.categoryId,
+                      productId: newHHRule.productId, minQuantity: newHHRule.discountType === '2x1' ? newHHRule.discountValue : 1,
+                      priority: 0,
+                    })
+                    setShowNewHHModal(false)
+                    setNewHHRule({ name: '', days: [1,2,3,4,5,6,0], timeStart: '18:00', timeEnd: '20:00', discountType: 'percentage', discountValue: 10, categoryId: null, productId: null, minQuantity: 1, priority: 0 })
+                    const rules = await window.api.happyHour.listRules()
+                    setHhRules(rules)
+                  }} disabled={!newHHRule.name.trim()}>
+                    <Zap size={14} className="mr-1" />Crear regla
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {hhRules.length === 0 && !showNewHHModal && (
+              <p className="text-body-sm text-text-muted">Sin reglas de hora feliz configuradas</p>
+            )}
+
+            {hhRules.length > 0 && (
+              <div className="space-y-2">
+                {hhRules.map((rule: any) => {
+                  let days: number[]
+                  try { days = JSON.parse(rule.days) } catch { days = [] }
+                  const dayNames = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb']
+                  return (
+                    <div key={rule.id} className="flex items-center justify-between p-3 rounded-xl bg-bg-tertiary border border-border-subtle">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className={`text-label px-1.5 py-0.5 rounded-full font-medium ${rule.enabled ? 'bg-status-success/20 text-status-success' : 'bg-text-hint/20 text-text-hint'}`}>
+                            {rule.enabled ? 'Activo' : 'Inactivo'}
+                          </span>
+                          <p className="text-body-sm font-medium text-text-primary">{rule.name}</p>
+                        </div>
+                        <div className="flex gap-3 mt-1 text-caption text-text-muted">
+                          <span>{rule.discount_type === 'percentage' ? `${rule.discount_value}%` : rule.discount_type === 'fixed' ? `Bs${rule.discount_value}` : `${rule.discount_value}x1`}</span>
+                          <span>{rule.time_start} - {rule.time_end}</span>
+                          <span>{days.map((d: number) => dayNames[d]).join(', ')}</span>
+                          {rule.category_id && <span>Categoría específica</span>}
+                          {rule.product_id && <span>Producto específico</span>}
+                        </div>
+                      </div>
+                      <div className="flex gap-1 ml-3">
+                        <button onClick={async () => {
+                          await window.api.happyHour.updateRule(rule.id, { enabled: rule.enabled ? 0 : 1 })
+                          const rules = await window.api.happyHour.listRules()
+                          setHhRules(rules)
+                        }} className="p-1.5 rounded-lg hover:bg-white/10 text-text-muted hover:text-text-primary transition-colors">
+                          {rule.enabled ? <EyeOff size={14} /> : <Eye size={14} />}
+                        </button>
+                        <button onClick={async () => {
+                          if (!confirm(`¿Eliminar regla "${rule.name}"?`)) return
+                          await window.api.happyHour.deleteRule(rule.id)
+                          const rules = await window.api.happyHour.listRules()
+                          setHhRules(rules)
+                        }} className="p-1.5 rounded-lg hover:bg-status-error/10 text-text-muted hover:text-status-error transition-colors">
+                          <X size={14} />
+                        </button>
+                      </div>
+                    </div>
+                  )
+                })}
               </div>
             )}
           </div>

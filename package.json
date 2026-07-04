@@ -30,7 +30,10 @@
       {
         "from": "resources/",
         "to": "resources/",
-        "filter": ["**/*", "!generate-icon.ps1"]
+        "filter": [
+          "**/*",
+          "!generate-icon.ps1"
+        ]
       }
     ],
     "extraMetadata": {
@@ -40,11 +43,15 @@
       "target": [
         {
           "target": "nsis",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         },
         {
           "target": "portable",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         }
       ],
       "artifactName": "${productName}-Setup-${version}.${ext}"
@@ -77,6 +84,7 @@
     "exceljs": "^4.4.0",
     "html-pdf-node": "^1.0.8",
     "lucide-react": "^0.383.0",
+    "nodemailer": "^9.0.3",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-router-dom": "^6.22.0",
@@ -87,6 +95,7 @@
     "@types/bcrypt": "^5.0.2",
     "@types/better-sqlite3": "^7.6.8",
     "@types/node": "^26.0.0",
+    "@types/nodemailer": "^8.0.1",
     "@types/react": "^18.2.55",
     "@types/react-dom": "^18.2.19",
     "@vitejs/plugin-react": "^4.2.1",

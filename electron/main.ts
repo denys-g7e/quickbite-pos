@@ -13,8 +13,12 @@ import { registerAIHandlers } from './ipc/ai'
 import { registerPrinterHandlers } from './ipc/printer'
 import { registerSettingsHandlers } from './ipc/settings'
 import { registerShiftHandlers } from './ipc/shifts'
+import { registerAuditHandlers } from './ipc/audit'
+import { registerKdsHandlers } from './ipc/kds'
+import { registerHappyHourHandlers } from './ipc/happy-hour'
 import { seedDatabase } from './db/seed'
 import { initializeDatabase } from './db/schema'
+import { sessionStore } from './session'
 
 let mainWindow: BrowserWindow | null = null
 let db: Database.Database | null = null
@@ -60,6 +64,8 @@ function createWindow() {
   }
 }
 
+let kdsWindow: BrowserWindow | null = null
+
 function registerAppHandlers() {
   ipcMain.handle('app:minimize', () => mainWindow?.minimize())
   ipcMain.handle('app:maximize', () => {
@@ -70,6 +76,39 @@ function registerAppHandlers() {
     }
   })
   ipcMain.handle('app:close', () => mainWindow?.close())
+  ipcMain.handle('app:restart', () => {
+    mainWindow?.webContents.reload()
+  })
+  ipcMain.handle('kds:open-window', () => {
+    if (kdsWindow && !kdsWindow.isDestroyed()) {
+      kdsWindow.focus()
+      return true
+    }
+    kdsWindow = new BrowserWindow({
+      width: 1024,
+      height: 768,
+      minWidth: 800,
+      minHeight: 600,
+      frame: false,
+      title: 'Cocina - QuickBite POS',
+      webPreferences: {
+        preload: path.join(__dirname, 'preload.js'),
+        nodeIntegration: false,
+        contextIsolation: true,
+        sandbox: false,
+      },
+      backgroundColor: '#0F1117',
+      show: false,
+    })
+    kdsWindow.setMenu(null)
+    kdsWindow.once('ready-to-show', () => kdsWindow?.show())
+    kdsWindow.on('closed', () => { kdsWindow = null })
+    const url = process.env.NODE_ENV === 'development' || process.argv.includes('--dev')
+      ? 'http://localhost:5173/#/kds'
+      : `file://${path.join(__dirname, '../../dist/index.html')}#/kds`
+    kdsWindow.loadURL(url)
+    return true
+  })
 }
 
 function registerDbHandlers() {
@@ -85,6 +124,9 @@ function registerDbHandlers() {
   registerPrinterHandlers(ipcMain, db, mainWindow)
   registerSettingsHandlers(ipcMain, db)
   registerShiftHandlers(ipcMain, db)
+  registerAuditHandlers(ipcMain, db)
+  registerKdsHandlers(ipcMain, db)
+  registerHappyHourHandlers(ipcMain, db)
 
   ipcMain.handle('app:export-db', async () => {
     const result = await dialog.showSaveDialog(mainWindow!, {
@@ -109,10 +151,37 @@ function registerDbHandlers() {
     if (!db) return false
     const email = db.prepare("SELECT value FROM settings WHERE key = 'notification_email'").get() as any
     const to = email?.value || 'admin@quickbite.com'
+    const dateStr = new Date().toLocaleString('es-BO')
+    const content = `QuickBite POS\nNotificacion de venta sin turno\n\nFecha: ${dateStr}\n\nSe realizo una venta sin tener un turno de caja abierto.\n\nPor favor, abre un turno de caja desde el panel de administracion.\n`
+
+    const dir = path.join(app.getPath('documents'), 'QuickBite POS')
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true })
+    const filename = `sin-turno-${Date.now()}.txt`
+    fs.writeFileSync(path.join(dir, filename), content, 'utf-8')
+
+    try {
+      const nodemailer = require('nodemailer')
+      const smtpHost = (db.prepare("SELECT value FROM settings WHERE key = 'smtp_host'").get() as any)?.value
+      const smtpPort = (db.prepare("SELECT value FROM settings WHERE key = 'smtp_port'").get() as any)?.value
+      const smtpUser = (db.prepare("SELECT value FROM settings WHERE key = 'smtp_user'").get() as any)?.value
+      const smtpPass = (db.prepare("SELECT value FROM settings WHERE key = 'smtp_pass'").get() as any)?.value
+      if (smtpHost && smtpUser && smtpPass) {
+        const transporter = nodemailer.createTransport({
+          host: smtpHost, port: parseInt(smtpPort || '587'), secure: smtpPort === '465',
+          auth: { user: smtpUser, pass: smtpPass },
+        })
+        await transporter.sendMail({
+          from: smtpUser, to,
+          subject: 'QuickBite POS - Venta sin turno abierto',
+          text: content,
+        })
+        return true
+      }
+    } catch {}
+
     const subject = encodeURIComponent('QuickBite POS - Venta sin turno abierto')
-    const body = encodeURIComponent(`Se realizó una venta sin tener un turno de caja abierto.\n\nFecha: ${new Date().toLocaleString('es-BO')}\n\nPor favor, abre un turno de caja desde el panel de administración.`)
-    const mailto = `mailto:${to}?subject=${subject}&body=${body}`
-    shell.openExternal(mailto).catch(() => {})
+    const body = encodeURIComponent(content)
+    shell.openExternal(`mailto:${to}?subject=${subject}&body=${body}`).catch(() => {})
     return true
   })
 
@@ -205,6 +274,49 @@ function runMigrations() {
     db.exec("ALTER TABLE users ADD COLUMN pin_attempts INTEGER DEFAULT 0")
     db.exec("ALTER TABLE users ADD COLUMN pin_blocked_until TEXT")
     db.exec("ALTER TABLE users ADD COLUMN must_change_password INTEGER DEFAULT 0")
+  }
+
+  const auditCols = db.prepare("PRAGMA table_info(audit_log)").all() as any[]
+  if (auditCols.length === 0) {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS audit_log (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER,
+        action TEXT NOT NULL,
+        entity_type TEXT,
+        entity_id INTEGER,
+        details TEXT,
+        created_at TEXT DEFAULT (datetime('now', 'localtime'))
+      )
+    `)
+  }
+
+  if (!cols.some((c: any) => c.name === 'item_status')) {
+    db.exec("ALTER TABLE order_items ADD COLUMN item_status TEXT DEFAULT 'pendiente'")
+    db.exec("ALTER TABLE order_items ADD COLUMN cancel_reason TEXT")
+    db.exec("ALTER TABLE order_items ADD COLUMN started_at TEXT")
+    db.exec("ALTER TABLE order_items ADD COLUMN ready_at TEXT")
+  }
+
+  const hhRuleCols = db.prepare("PRAGMA table_info(happy_hour_rules)").all() as any[]
+  if (hhRuleCols.length === 0) {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS happy_hour_rules (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        enabled INTEGER DEFAULT 1,
+        days TEXT NOT NULL DEFAULT '[1,2,3,4,5,6,0]',
+        time_start TEXT NOT NULL DEFAULT '18:00',
+        time_end TEXT NOT NULL DEFAULT '20:00',
+        discount_type TEXT NOT NULL DEFAULT 'percentage' CHECK(discount_type IN ('percentage', 'fixed', '2x1')),
+        discount_value REAL NOT NULL DEFAULT 10,
+        category_id INTEGER,
+        product_id INTEGER,
+        min_quantity INTEGER DEFAULT 1,
+        priority INTEGER DEFAULT 0,
+        created_at TEXT DEFAULT (datetime('now', 'localtime'))
+      )
+    `)
   }
 }
 

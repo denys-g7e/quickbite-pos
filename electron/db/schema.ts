@@ -68,7 +68,11 @@ export function initializeDatabase(db: Database.Database) {
       quantity INTEGER NOT NULL,
       subtotal REAL NOT NULL,
       notes TEXT,
-      category_name TEXT DEFAULT ''
+      category_name TEXT DEFAULT '',
+      item_status TEXT DEFAULT 'pendiente' CHECK(item_status IN ('pendiente','en_cocina','en_barra','listo','entregado','cancelado')),
+      cancel_reason TEXT,
+      started_at TEXT,
+      ready_at TEXT
     );
 
     CREATE TABLE IF NOT EXISTS settings (
@@ -85,6 +89,32 @@ export function initializeDatabase(db: Database.Database) {
       closed_at TEXT,
       status TEXT DEFAULT 'open' CHECK(status IN ('open', 'closed')),
       notes TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS audit_log (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER,
+      action TEXT NOT NULL,
+      entity_type TEXT,
+      entity_id INTEGER,
+      details TEXT,
+      created_at TEXT DEFAULT (datetime('now', 'localtime'))
+    );
+
+    CREATE TABLE IF NOT EXISTS happy_hour_rules (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      enabled INTEGER DEFAULT 1,
+      days TEXT NOT NULL DEFAULT '[1,2,3,4,5,6,0]',
+      time_start TEXT NOT NULL DEFAULT '18:00',
+      time_end TEXT NOT NULL DEFAULT '20:00',
+      discount_type TEXT NOT NULL DEFAULT 'percentage' CHECK(discount_type IN ('percentage', 'fixed', '2x1')),
+      discount_value REAL NOT NULL DEFAULT 10,
+      category_id INTEGER,
+      product_id INTEGER,
+      min_quantity INTEGER DEFAULT 1,
+      priority INTEGER DEFAULT 0,
+      created_at TEXT DEFAULT (datetime('now', 'localtime'))
     );
   `)
 }
