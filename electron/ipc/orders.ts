@@ -206,6 +206,9 @@ export function registerOrderHandlers(ipcMain: IpcMain, db: Database.Database) {
     if (status === 'preparing') {
       db.prepare("UPDATE order_items SET item_status = CASE WHEN category_name IN ('Bebidas') THEN 'en_barra' ELSE 'en_cocina' END WHERE order_id = ? AND item_status = 'pendiente'").run(id)
     }
+    if (status === 'cancelled') {
+      db.prepare("UPDATE order_items SET item_status = 'cancelado', cancel_reason = NULL WHERE order_id = ? AND item_status NOT IN ('cancelado','entregado')").run(id)
+    }
 
     const completedAt = status === 'completed' ? new Date().toISOString() : null
     db.prepare('UPDATE orders SET status = ?, completed_at = COALESCE(?, completed_at) WHERE id = ?').run(status, completedAt, id)

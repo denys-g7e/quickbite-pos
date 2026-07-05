@@ -59,7 +59,7 @@ export function registerAuthHandlers(ipcMain: IpcMain, db: Database.Database) {
     const BLOCK_MINUTES = 30
 
     if (userId) {
-      const user = db.prepare('SELECT pin, is_active FROM users WHERE id = ?').get(userId) as any
+      const user = db.prepare('SELECT pin, is_active, pin_attempts, pin_blocked_until FROM users WHERE id = ?').get(userId) as any
       if (!user || !user.pin) throw new Error('PIN inválido')
       if (user.pin_attempts >= MAX_ATTEMPTS && user.pin_blocked_until) {
         const blocked = new Date(user.pin_blocked_until)
